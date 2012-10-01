@@ -65,16 +65,51 @@ let reduce obj mem =
   let reduced = HC.reduce automaton in
   normalize obj mem reduced
 
+let represent obj mem =
+  let init i = match mem.(i) with
+  | String s -> Obj.repr (String.copy s)
+  | Struct (tag, value) -> Obj.new_block tag (Array.length value)
+  in
+  let data = Array.init (Array.length mem) init in
+  let represent = function
+  | Int n -> Obj.repr n
+  | Ptr p -> data.(p)
+  | Atm t -> Obj.new_block t 0
+  in
+  let iter ptr = function
+  | String _ -> ()
+  | Struct (_, value) ->
+    let iter i obj = Obj.set_field data.(ptr) i (represent obj) in
+    Array.iteri iter value
+  in
+  let () = Array.iteri iter mem in
+  represent obj
+
 let () =
   let file = Sys.argv.(1) in
   let () = Printf.eprintf "unmarshalling...\n%!" in
-  let chan = open_in file in
-  let _ = input_binary_int chan in
-  let (obj, mem) = parse chan in
+  let in_chan = open_in file in
+  let out_chan = open_out (file ^ ".clean") in
+  (* magic number *)
+  let magic = input_binary_int in_chan in
+  let () = output_binary_int out_chan magic in
+  (* library *)
+  let (obj, mem) = parse in_chan in
   let () = Printf.eprintf "library: %i objects\n%!" (Array.length mem) in
-  let (_, mem) = reduce obj mem in
+  let (obj, mem) = reduce obj mem in
   let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length mem) in
-  let _ = parse chan in
-  let (obj, mem) = parse chan in
-  let _ = reduce obj mem in
-  close_in chan
+  let obj = represent obj mem in
+  let () = Marshal.to_channel out_chan obj [] in
+  (* digest *)
+  let digest = Marshal.from_channel in_chan in
+  let () = Marshal.to_channel out_chan digest [] in
+  (* table *)
+  let (obj, mem) = parse in_chan in
+  let () = Printf.eprintf "table: %i objects\n%!" (Array.length mem) in
+  let (obj, mem) = reduce obj mem in
+  let () = Printf.eprintf "compact table: %i objects\n%!" (Array.length mem) in
+  let obj = represent obj mem in
+  let () = Marshal.to_channel out_chan obj [] in
+  (* closing all *)
+  let () = close_in in_chan in
+  close_out out_chan
