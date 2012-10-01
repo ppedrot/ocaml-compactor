@@ -1,7 +1,7 @@
 OCAMLC=ocamlc
 OCAMLOPT=ocamlopt
 OCAMLDEP=ocamldep
-MLFILES=hopcroft.ml inspect.ml
+MLFILES=hopcroft.ml analyze.ml inspect.ml
 
 all: dep opt
 
