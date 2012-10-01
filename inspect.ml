@@ -350,4 +350,4 @@ let main () =
 (*   pr_dot_mem stdout obj (filter mem 0x71b) *)
   ()
 
-let () = main ()
+(* let () = main () *)

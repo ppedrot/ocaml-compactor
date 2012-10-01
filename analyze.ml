@@ -14,7 +14,7 @@ let code_block64 = 0x13
 let code_string8 = 0x9
 let code_string32 = 0xA
 
-(*let input_byte (s, off) =
+(* let input_byte (s, off) =
   let ans = Char.code (s.[!off]) in
   let () = incr off in
   ans
@@ -67,9 +67,9 @@ type repr =
 | RPointer of int
 
 type data =
-| Int of int
-| Ptr of int
-| Atom of int (* tag *)
+| Int of int (* value *)
+| Ptr of int (* pointer *)
+| Atm of int (* tag *)
 
 type obj =
 | Struct of int * data array (* tag × data *)
@@ -218,7 +218,11 @@ let parse chan =
   let memory = Array.make size (Struct ((-1), [||])) in
   let current_object = ref (pred size) in
   let rec fill accu = function
-  | [] -> ()
+  | [] ->
+    begin match accu with
+    | [obj] -> obj
+    | _ -> assert false
+    end
   | RPointer n :: mem ->
     let data = Ptr (!current_object - n + 1) in
     fill (data :: accu) mem
@@ -232,20 +236,20 @@ let parse chan =
     fill (data :: accu) mem
   | RBlock (tag, 0) :: mem ->
     (* Atoms are never shared *)
-    let data = Atom tag in
+    let data = Atm tag in
     fill (data :: accu) mem
   | RBlock (tag, len) :: mem ->
     let data = Ptr !current_object in
-    let block = Array.make len (Atom (-1)) in
+    let block = Array.make len (Atm (-1)) in
     let () = memory.(!current_object) <- Struct (tag, block) in
     let () = decr current_object in
     let accu = take block 0 len accu in
     fill (data :: accu) mem
   in
-  let () = fill [] stream in
-  memory
+  let obj = fill [] stream in
+  (obj, memory)
 
-let dump chan =
+(*let dump chan =
   let magic = input_binary_int chan in
   let light = parse chan in
   let digest = parse chan in
@@ -255,4 +259,4 @@ let dump chan =
 let () =
   let chan = open_in Sys.argv.(1) in
   let _ = dump chan in
-  ()
+  ()*)
