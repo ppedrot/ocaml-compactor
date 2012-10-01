@@ -2,3 +2,4 @@
 *.cmx
 *.cmi
 *.o
+.deps

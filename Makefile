@@ -27,5 +27,7 @@ dep:
 clean:
 	@rm -f *.cm[oxai]
 	@rm -f *.cm[o]
+	@rm -f *.[o]
+	@rm -f $(PROG)
 
 -include .deps
