@@ -312,6 +312,18 @@ let pr_dot_mem chan obj mem =
   IntMap.iter iter mem;
   Printf.fprintf chan "\n}\n"
 
+let parse chan =
+  let magic = String.create 4 in
+  let () = for i = 0 to 3 do magic.[i] <- input_char chan done in
+  let length = input_binary_int chan in
+  let objects = input_binary_int chan in
+  let size32 = input_binary_int chan in
+  let size64 = input_binary_int chan in
+  for i = 0 to pred length do
+    ignore (input_char chan);
+  done;
+  (magic, length, size32, size64, objects)
+
 let main () =
   let file = Sys.argv.(1) in
   let () = Printf.eprintf "unmarshalling...\n%!" in
@@ -319,20 +331,23 @@ let main () =
   (* magic number *)
   let _ = input_binary_int chan in
   (* light lib *)
-  let obj = Marshal.from_channel chan in
+  let (_, s, _, _, obj) = parse chan in
+  let () = Printf.eprintf "lib: %i bytes, %i objects\n%!" s obj in
   (* digest *)
-  let _ = Marshal.from_channel chan in
+  let _ = parse chan in
   (* full lib *)
-  let _ = Marshal.from_channel chan in
+  let (_, s, _, _, obj) = parse chan in
+  let () = Printf.eprintf "table: %i bytes, %i objects\n%!" s obj in
   let () = close_in chan in
   let () = Printf.eprintf "dumping...\n%!" in
-  let obj, mem = dump obj in
-  let () = Printf.eprintf "memsize: %i\n%!" (IntMap.cardinal mem) in
-  let obj, mem = reduce obj mem in
-  let () = Printf.eprintf "memsize: %i\n%!" (IntMap.cardinal mem) in
+(*   let obj, mem = dump obj in *)
+(*   let () = Printf.eprintf "memsize: %i\n%!" (IntMap.cardinal mem) in *)
+(*   let obj, mem = reduce obj mem in *)
+(*   let () = Printf.eprintf "memsize: %i\n%!" (IntMap.cardinal mem) in *)
 (*   let _ = undump obj mem in *)
-  pr_mem stdout obj mem
+(*   pr_mem stdout obj mem *)
 (*   pr_dot_mem stdout obj (filter mem 0x00) *)
 (*   pr_dot_mem stdout obj (filter mem 0x71b) *)
+  ()
 
 let () = main ()
