@@ -17,14 +17,17 @@ module HC = Hopcroft.Make(TransitionOrd)
 
 let normalize obj mem cl =
   let size = Array.length mem in
+  (** [assoc.(i)] contains the equivalence class of [i]. *)
   let assoc = Array.make size (-1) in
-  let compact_mem = Array.make (Array.length cl) (Struct (-1, [||])) in
   let iter cli elts = List.iter (fun i -> assoc.(i) <- cli) elts in
   let () = Array.iteri iter cl in
+  (** Initialize the new memory with dummy values *)
+  let compact_mem = Array.make (Array.length cl) (Struct (-1, [||])) in
   let canonical content = match content with
   | Int _ | Atm _ -> content
   | Ptr p -> Ptr assoc.(p)
   in
+  (** Fill the new memory with canonical names *)
   let iter idx cli =
     (** Choose an element *)
     let repr = List.hd cli in
@@ -35,9 +38,11 @@ let normalize obj mem cl =
     compact_mem.(idx) <- data
   in
   let () = Array.iteri iter cl in
+  (** Return canonical entry point and compacted memory *)
   (canonical obj, compact_mem)
 
 let reduce obj mem =
+  (** Create the automaton *)
   let size = Array.length mem in
   let transitions = ref [] in
   let push lbl src dst =
@@ -70,6 +75,7 @@ let represent obj mem =
   | String s -> Obj.repr (String.copy s)
   | Struct (tag, value) -> Obj.new_block tag (Array.length value)
   in
+  (** Initialize the new memory with the corresponding blocks *)
   let data = Array.init (Array.length mem) init in
   let represent = function
   | Int n -> Obj.repr n
@@ -82,7 +88,9 @@ let represent obj mem =
     let iter i obj = Obj.set_field data.(ptr) i (represent obj) in
     Array.iteri iter value
   in
+  (** Fill the inter-objects pointers *)
   let () = Array.iteri iter mem in
+  (** Return the entry point *)
   represent obj
 
 let () =

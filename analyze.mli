@@ -8,3 +8,5 @@ type obj =
 | String of string
 
 val parse : in_channel -> (data * obj array)
+(** Return the entry point and the reification of the memory out of a marshalled
+    structure. *)
