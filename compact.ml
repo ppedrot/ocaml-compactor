@@ -95,29 +95,35 @@ let represent obj mem =
 
 let () =
   let file = Sys.argv.(1) in
+  (** Input phase *)
   let () = Printf.eprintf "unmarshalling...\n%!" in
   let in_chan = open_in file in
-  let out_chan = open_out (file ^ ".clean") in
   (* magic number *)
   let magic = input_binary_int in_chan in
-  let () = output_binary_int out_chan magic in
   (* library *)
-  let (obj, mem) = parse in_chan in
-  let () = Printf.eprintf "library: %i objects\n%!" (Array.length mem) in
-  let (obj, mem) = reduce obj mem in
-  let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length mem) in
-  let obj = represent obj mem in
-  let () = Marshal.to_channel out_chan obj [] in
+  let (libobj, libmem) = parse in_chan in
   (* digest *)
   let digest = Marshal.from_channel in_chan in
-  let () = Marshal.to_channel out_chan digest [] in
   (* table *)
-  let (obj, mem) = parse in_chan in
-  let () = Printf.eprintf "table: %i objects\n%!" (Array.length mem) in
-  let (obj, mem) = reduce obj mem in
-  let () = Printf.eprintf "compact table: %i objects\n%!" (Array.length mem) in
-  let obj = represent obj mem in
-  let () = Marshal.to_channel out_chan obj [] in
-  (* closing all *)
+  let (tableobj, tablemem) = parse in_chan in
   let () = close_in in_chan in
+  (** Output phase *)
+  let out_chan = open_out (file ^ ".clean") in
+  (** magic number *)
+  let () = output_binary_int out_chan magic in
+  (** library *)
+  let () = Printf.eprintf "library: %i objects\n%!" (Array.length libmem) in
+  let (libobj, libmem) = reduce libobj libmem in
+  let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length libmem) in
+  let libobj = represent libobj libmem in
+  let () = Marshal.to_channel out_chan libobj [] in
+  (** digest *)
+  let () = Marshal.to_channel out_chan digest [] in
+  (** table *)
+  let () = Printf.eprintf "table: %i objects\n%!" (Array.length tablemem) in
+  let (tableobj, mem) = reduce tableobj tablemem in
+  let () = Printf.eprintf "compact table: %i objects\n%!" (Array.length tablemem) in
+  let tableobj = represent tableobj tablemem in
+  let () = Marshal.to_channel out_chan tableobj [] in
+  (* closing all *)
   close_out out_chan
