@@ -70,6 +70,9 @@ let reduce obj mem =
   let reduced = HC.reduce automaton in
   normalize obj mem reduced
 
+let reduce obj mem =
+  if Array.length mem = 0 then (obj, mem) else reduce obj mem
+
 let represent obj mem =
   let init i = match mem.(i) with
   | String s -> Obj.repr (String.copy s)
@@ -94,10 +97,11 @@ let represent obj mem =
   represent obj
 
 let () =
-  let file = Sys.argv.(1) in
+  let in_file = Sys.argv.(1) ^ "o" in
+  let out_file = in_file in
   (** Input phase *)
-  let () = Printf.eprintf "unmarshalling...\n%!" in
-  let in_chan = open_in file in
+(*   let () = Printf.eprintf "unmarshalling...\n%!" in *)
+  let in_chan = open_in in_file in
   (* magic number *)
   let magic = input_binary_int in_chan in
   (* library *)
@@ -107,23 +111,24 @@ let () =
   (* table *)
   let (tableobj, tablemem) = parse in_chan in
   let () = close_in in_chan in
+  (** Reduce phase *)
+  let (libobj, libmem) = reduce libobj libmem in
+  let libobj = represent libobj libmem in
+  let (tableobj, tablemem) = reduce tableobj tablemem in
+  let tableobj = represent tableobj tablemem in
   (** Output phase *)
-  let out_chan = open_out (file ^ ".clean") in
+  let out_chan = open_out out_file in
   (** magic number *)
   let () = output_binary_int out_chan magic in
   (** library *)
-  let () = Printf.eprintf "library: %i objects\n%!" (Array.length libmem) in
-  let (libobj, libmem) = reduce libobj libmem in
-  let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length libmem) in
-  let libobj = represent libobj libmem in
+(*   let () = Printf.eprintf "library: %i objects\n%!" (Array.length libmem) in *)
+(*   let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length libmem) in *)
   let () = Marshal.to_channel out_chan libobj [] in
   (** digest *)
   let () = Marshal.to_channel out_chan digest [] in
   (** table *)
-  let () = Printf.eprintf "table: %i objects\n%!" (Array.length tablemem) in
-  let (tableobj, tablemem) = reduce tableobj tablemem in
-  let () = Printf.eprintf "compact table: %i objects\n%!" (Array.length tablemem) in
-  let tableobj = represent tableobj tablemem in
+(*   let () = Printf.eprintf "table: %i objects\n%!" (Array.length tablemem) in *)
+(*   let () = Printf.eprintf "compact table: %i objects\n%!" (Array.length tablemem) in *)
   let () = Marshal.to_channel out_chan tableobj [] in
   (* closing all *)
   close_out out_chan

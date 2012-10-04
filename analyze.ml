@@ -86,7 +86,7 @@ let input_int8u = input_byte
 let input_int16s chan =
   let i = input_byte chan in
   let j = input_byte chan in
-  let ans = (i lsl 8) land j in
+  let ans = (i lsl 8) lor j in
   if i land 0x80 = 0
     then ans
     else ans lor ((-1) lsl 16)
