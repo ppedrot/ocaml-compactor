@@ -121,7 +121,7 @@ let () =
   let () = Marshal.to_channel out_chan digest [] in
   (** table *)
   let () = Printf.eprintf "table: %i objects\n%!" (Array.length tablemem) in
-  let (tableobj, mem) = reduce tableobj tablemem in
+  let (tableobj, tablemem) = reduce tableobj tablemem in
   let () = Printf.eprintf "compact table: %i objects\n%!" (Array.length tablemem) in
   let tableobj = represent tableobj tablemem in
   let () = Marshal.to_channel out_chan tableobj [] in
