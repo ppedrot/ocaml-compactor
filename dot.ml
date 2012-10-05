@@ -72,25 +72,40 @@ let pr_dot_link test ptr chan = function
   done
 | _ -> ()
 
-let closure mem target =
+let reverse_pointers mem =
   (* compute reverse pointers *)
-  let rev_ptr = Array.make (Array.length mem) [] in
+  let ptrs = Array.make (Array.length mem) [] in
   let iter ptr = function
   | Struct (i, v) ->
     let iter = function
-    | Ptr p -> rev_ptr.(p) <- p :: rev_ptr.(p)
+    | Ptr p -> ptrs.(p) <- p :: ptrs.(p)
     | _ -> ()
     in
     Array.iter iter v
   | String _ -> ()
   in
   let () = Array.iteri iter mem in
-  (** reverse closure *)
+  ptrs
+
+let forward_pointers mem =
+  (* compute forward pointers *)
+  let get_pointers = function
+  | Struct (_, value) ->
+    let fold accu = function
+    | Ptr p -> p :: accu
+    | _ -> accu
+    in
+    Array.fold_left fold [] value
+  | _ -> []
+  in
+  Array.init (Array.length mem) (fun ptr -> get_pointers mem.(ptr))
+
+let closure ptrs target =
   let step visited todo =
     let nvisited = IntSet.union visited todo in
     (** Add every previous element *)
     let fold elt accu =
-      let neighbours = rev_ptr.(elt) in
+      let neighbours = ptrs.(elt) in
       let fold accu e = if IntSet.mem e nvisited then accu else IntSet.add e accu in
       List.fold_left fold accu neighbours
     in
@@ -103,6 +118,14 @@ let closure mem target =
     else closure nv nt
   in
   closure IntSet.empty target
+
+let back_closure mem target =
+  let rev_ptrs = reverse_pointers mem in
+  closure rev_ptrs target
+
+let forth_closure mem target =
+  let for_ptrs = forward_pointers mem in
+  closure for_ptrs target
 
 let pr_dot_mem chan (obj, mem) =
   let iter ptr obj =
