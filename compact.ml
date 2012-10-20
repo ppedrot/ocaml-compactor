@@ -41,7 +41,7 @@ let normalize obj mem cl =
   (** Return canonical entry point and compacted memory *)
   (canonical obj, compact_mem)
 
-let reduce obj mem =
+let to_automaton obj mem =
   (** Create the automaton *)
   let size = Array.length mem in
   let transitions = ref [] in
@@ -62,16 +62,16 @@ let reduce obj mem =
     push (StringT s) ptr ptr
   in
   let () = Array.iteri iter mem in
-  let automaton = {
-    Hopcroft.states = size;
+  { Hopcroft.states = size;
     transitions = Array.of_list !transitions;
-    final_states = [||];
-  } in
-  let reduced = HC.reduce automaton in
-  normalize obj mem reduced
+    final_states = [||]; }
 
 let reduce obj mem =
-  if Array.length mem = 0 then (obj, mem) else reduce obj mem
+  if Array.length mem = 0 then (obj, mem)
+  else
+    let automaton = to_automaton obj mem in
+    let reduced = HC.reduce automaton in
+    normalize obj mem reduced
 
 let represent obj mem =
   let init i = match mem.(i) with
@@ -96,8 +96,8 @@ let represent obj mem =
   (** Return the entry point *)
   represent obj
 
-let () =
-  let in_file = Sys.argv.(1) ^ "o" in
+let main () =
+  let in_file = Sys.argv.(1) in
   let out_file = in_file in
   (** Input phase *)
 (*   let () = Printf.eprintf "unmarshalling...\n%!" in *)
@@ -132,3 +132,30 @@ let () =
   let () = Marshal.to_channel out_chan tableobj [] in
   (* closing all *)
   close_out out_chan
+
+let () = main ()
+
+(*let () =
+  let open Dot in
+  let in_file = Sys.argv.(1) in
+  let in_chan = open_in in_file in
+  (* magic number *)
+  let _ = input_binary_int in_chan in
+  (* library *)
+  let (obj, mem) = parse in_chan in
+  let () = close_in in_chan in
+  let automaton = to_automaton obj mem in
+  let reduced = HC.reduce automaton in
+  let (obj, mem) = normalize obj mem reduced in
+  let fold (ptr, accu) cl =
+    if List.length cl < 100 then (succ ptr, accu)
+    else (succ ptr, IntSet.add ptr accu)
+  in
+  let (_, target) = Array.fold_left fold (0, IntSet.empty) reduced in
+(*   let target = Dot.back_closure mem target in *)
+  Dot.pr_mem (fun ptr -> IntSet.mem ptr target) stdout (obj, mem)*)
+(*   for i = 0 to pred (Array.length reduced) do *)
+(*     Printf.printf "%i\n" (List.length reduced.(i)) *)
+(*   done; *)
+
+(*   let fold accu  *)

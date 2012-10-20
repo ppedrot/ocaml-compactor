@@ -28,8 +28,11 @@ let pr_obj chan = function
   Printf.fprintf chan "%i[%a]" i pr_list 0
 | String s -> Printf.fprintf chan "\"%s\"" (String.escaped s)
 
-let pr_mem chan obj mem =
-  let iter id obj = Printf.fprintf chan "0x%08x -> %a\n" id pr_obj obj in
+let pr_mem choose chan (obj, mem) =
+  let iter id obj =
+    if choose id then
+      Printf.fprintf chan "0x%08x -> %a\n" id pr_obj obj
+  in
   Array.iteri iter mem
 
 let pr_atom chan = function
@@ -58,7 +61,6 @@ let pr_dot_obj ptr chan = function
   Printf.fprintf chan "[label=\"string:%08x\", fillcolor=\"green\", style=\"filled\"]" ptr
 
 let pr_dot_link test ptr chan = function
-| Struct (i, [||]) -> ()
 | Struct (i, v) ->
   let len = Array.length v in
   for i = 0 to len - 1 do
@@ -78,7 +80,7 @@ let reverse_pointers mem =
   let iter ptr = function
   | Struct (i, v) ->
     let iter = function
-    | Ptr p -> ptrs.(p) <- p :: ptrs.(p)
+    | Ptr p -> ptrs.(p) <- ptr :: ptrs.(p)
     | _ -> ()
     in
     Array.iter iter v
@@ -127,12 +129,14 @@ let forth_closure mem target =
   let for_ptrs = forward_pointers mem in
   closure for_ptrs target
 
-let pr_dot_mem chan (obj, mem) =
+let pr_dot_mem choose chan (obj, mem) =
   let iter ptr obj =
-    Printf.fprintf chan "struct_%08x%a;\n" ptr (pr_dot_obj ptr) obj;
-    pr_dot_link (fun ptr -> true) ptr chan obj;
-    Printf.fprintf chan "\n";
-    pr_atom chan obj;
+    if choose ptr then begin
+      Printf.fprintf chan "struct_%08x%a;\n" ptr (pr_dot_obj ptr) obj;
+      pr_dot_link choose ptr chan obj;
+      Printf.fprintf chan "\n";
+      pr_atom chan obj;
+    end
   in
   Printf.fprintf chan "digraph G {\n";
   Printf.fprintf chan "node[shape=\"record\"]\n";

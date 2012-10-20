@@ -8,5 +8,10 @@ val back_closure : obj array -> IntSet.t -> IntSet.t
 val forth_closure : obj array -> IntSet.t -> IntSet.t
 (** Forward transitive closure of the memory *)
 
-val pr_dot_mem : out_channel -> (data * obj array) -> unit
-(** Print memory as a dot graph *)
+val pr_mem : (int -> bool) -> out_channel -> (data * obj array) -> unit
+(** Print memory as a human readable output. The first argument selects memory 
+    nodes to display. *)
+
+val pr_dot_mem : (int -> bool) -> out_channel -> (data * obj array) -> unit
+(** Print memory as a dot graph. The first argument selects memory nodes to
+    display. *)
