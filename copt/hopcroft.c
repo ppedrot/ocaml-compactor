@@ -154,8 +154,6 @@ void hopcroft_split(set s) {
 void hopcroft_reduce() {
   int prev, partprev, trans, split, len, state;
   while (0 < buffer_length(trans_waiting)) {
-    partition_print(trans_partition);
-    partition_print(state_partition);
     split = buffer_pop(trans_waiting);
     trans = partition_first(trans_partition, split);
     while (0 <= trans) {
@@ -189,10 +187,6 @@ void hopcroft_free() {
 
 void hopcroft_print() {
   int i;
-  for (i = 0; i < state_len; i++) {
-    printf("%i ==> %i\n", i, partition_contents(state_partition)[i]);
-    fflush(stdout);
-  }
   for (i = 0; i < trans_len; i++) {
     trans_print (trans_val + i); fflush(stdout);
   }

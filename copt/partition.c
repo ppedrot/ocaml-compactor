@@ -87,7 +87,7 @@ int partition_split(partition* p, set s) {
   for (i = p->first[len]; i < p->last[len]; i++) {
     p->index[p->elements[i]] = len;
   }
-  return (len + 1);
+  return len;
 }
 
 void partition_mark(partition* p, int i) {
