@@ -12,7 +12,7 @@ typedef union label {
   string lbl_str;
   int lbl_tag;
   int lbl_ptr;
-  int lbl_atm;
+  intfield lbl_atm;
   intfield lbl_int;
 } label;
 

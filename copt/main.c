@@ -22,7 +22,8 @@ int main () {
   trans_val = calloc(trans_len, sizeof(transition));
 
   (trans_val + 0)->tpe = LBLATM;
-  (trans_val + 0)->lbl.lbl_atm = 42;
+  (trans_val + 0)->lbl.lbl_atm.intfield_num = 18;
+  (trans_val + 0)->lbl.lbl_atm.intfield_val = 42;
   (trans_val + 0)->src = 0;
   (trans_val + 0)->dst = 0;
 

@@ -13,10 +13,11 @@ static buffer* state_touched;
 static buffer* trans_waiting;
 static buffer* trans_touched;
 
-int strlbl_cmp(label p1, label p2) {
+int strlbl_cmp(label* p1, label* p2) {
   int i;
-  string s1 = p1.lbl_str;
-  string s2 = p2.lbl_str;
+  string s1 = p1->lbl_str;
+  string s2 = p2->lbl_str;
+  if (s1.string_ptr == s2.string_ptr) return 0;
   if (s1.string_len != s2.string_len)
     return (s1.string_len - s2.string_len);
   for (i = 0; i < s1.string_len; i++) {
@@ -26,9 +27,17 @@ int strlbl_cmp(label p1, label p2) {
   return 0;
 }
 
-int intlbl_cmp(label p1, label p2) {
-  intfield f1 = p1.lbl_int;
-  intfield f2 = p2.lbl_int;
+int intlbl_cmp(label* p1, label* p2) {
+  intfield f1 = p1->lbl_int;
+  intfield f2 = p2->lbl_int;
+  if (f1.intfield_num != f2.intfield_num)
+    return (f1.intfield_num - f2.intfield_num);
+  return (f1.intfield_val - f2.intfield_val);
+}
+
+int atmlbl_cmp(label* p1, label* p2) {
+  intfield f1 = p1->lbl_atm;
+  intfield f2 = p2->lbl_atm;
   if (f1.intfield_num != f2.intfield_num)
     return (f1.intfield_num - f2.intfield_num);
   return (f1.intfield_val - f2.intfield_val);
@@ -40,15 +49,15 @@ int trans_cmp(const void* p1, const void* p2) {
   if (t1->tpe != t2->tpe) return (t1->tpe - t2->tpe);
   switch (t1->tpe) {
     case LBLSTR:
-      return (strlbl_cmp(t1->lbl, t2->lbl));
+      return (strlbl_cmp(&(t1->lbl), &(t2->lbl)));
     case LBLTAG:
       return (t1->lbl.lbl_tag - t2->lbl.lbl_tag);
     case LBLPTR:
       return (t1->lbl.lbl_ptr - t2->lbl.lbl_ptr);
     case LBLINT:
-      return (intlbl_cmp(t1->lbl, t2->lbl));
+      return (intlbl_cmp(&(t1->lbl), &(t2->lbl)));
     case LBLATM:
-      return (t1->lbl.lbl_atm - t2->lbl.lbl_atm);
+      return (intlbl_cmp(&(t1->lbl), &(t2->lbl)));
     default:
       return 0;
   }
@@ -70,7 +79,7 @@ void trans_print(transition* t) {
       printf ("INT %i %i\n", t->lbl.lbl_int.intfield_num, t->lbl.lbl_int.intfield_val);
       return;
     case LBLATM:
-      printf ("ATM %i\n", t->lbl.lbl_atm);
+      printf ("ATM %i %i\n", t->lbl.lbl_atm.intfield_num, t->lbl.lbl_atm.intfield_val);
       return;
     default:
       return;
