@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include "partition.h"
 
 struct partition {
@@ -71,11 +70,11 @@ void partition_resize (partition* p) {
 
 int partition_split(partition* p, set s) {
   int i, len;
-  assert (
+/*  assert (
     s < p->plength &&
     p->marked[s] <= p->last[s] &&
     p->first[s] <= p->marked[s]
-  );
+  ); */
   if (p->marked[s] == p->last[s]) p->marked[s] = p->first[s];
   if (p->marked[s] == p->first[s]) return (-1);
   len = (p->plength)++;

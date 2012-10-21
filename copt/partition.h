@@ -20,8 +20,6 @@ int partition_cardinal(partition* p);
 
 set* partition_contents(partition* p);
 
-int partition_choose(partition* p, set s);
-
 int partition_size(partition* p, set s);
 
 int partition_first(partition* p, set s);
