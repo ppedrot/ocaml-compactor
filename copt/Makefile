@@ -1,5 +1,5 @@
-CC=gcc
-CFLAGS=-W -Wall -pedantic -fPIC -I"/usr/lib/ocaml"
+CC=c99
+CFLAGS=-W -Wextra -Wall -pedantic -fPIC -I"/usr/lib/ocaml"
 LDFLAGS=
 SRC=buffer.c partition.c hopcroft.c interface.c main.c
 OBJ=$(patsubst %.c,%.o,$(SRC))
