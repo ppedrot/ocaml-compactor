@@ -4,17 +4,13 @@
 #ifndef CAML_COMPACTOR_INTERFACE_H
 #define CAML_COMPACTOR_INTERFACE_H
 
+/* Scalars */
+
 typedef long int_value;
 /* OCaml int */
 
 typedef size_t ptr_value;
 /* Absolute pointer in the memory reification */
-
-typedef struct str_value {
-  size_t str_value_len;
-  char* str_value_val;
-} str_value;
-/* OCaml string */
 
 typedef value* abs_value;
 /* Abstract value in OCaml heap */
@@ -36,10 +32,34 @@ typedef struct value_data {
   union value_field value_data_val;
 } value_data;
 
-typedef struct tbl_value {
+/* Structured data */
+
+typedef enum {
+  STRUCT_TBL, // Array
+  STRUCT_STR, // String
+} struct_tag;
+
+typedef struct str_struct {
+  size_t str_value_len;
+  char* str_value_val;
+} str_struct;
+/* OCaml string */
+
+typedef struct tbl_struct {
+  header_t tbl_value_hdr;
   size_t tbl_value_len;
   value_data* tbl_value_tbl;
-} tbl_value;
+} tbl_struct;
 /* OCaml structured values */
+
+union struct_field {
+  str_struct str_val;
+  tbl_struct tbl_val;
+};
+
+typedef struct struct_data {
+  struct_tag struct_data_tag;
+  union struct_field struct_data_val;
+} struct_data;
 
 #endif

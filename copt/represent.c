@@ -35,6 +35,8 @@ static uintnat obj_counter;  /* Number of objects emitted so far */
 static void extern_out_of_memory(void);
 // static void extern_invalid_argument(char *msg);
 
+/* Trail information */
+
 struct trail_entry {
   value obj;    /* address of object + initial color in low 2 bits */
   value field0; /* initial contents of field 0 */
@@ -117,12 +119,52 @@ static void extern_record_location(value obj)
   obj_counter++;
 }
 
+/* Output buffer */
+
+static struct_data* output_buffer;
+static int output_buffer_size; /* Real size */
+static int output_buffer_length; /* Current occupation */
+
+void value_data_clear(value_data* data) {
+  // TODO;
+}
+
+void output_buffer_init() {
+  output_buffer = malloc(sizeof(struct_data) * 97);
+  if (output_buffer == NULL) extern_out_of_memory();
+  output_buffer_size = 97;
+  output_buffer_length = 0;
+}
+
+void output_buffer_clear() {
+  int i;
+  for(i = 0; i < output_buffer_length; i++) {
+    switch(output_buffer[i].struct_data_tag) {
+      case STRUCT_TBL:
+        value_data_clear(output_buffer[i].struct_data_val.tbl_val.tbl_value_tbl);
+        break;
+      case STRUCT_STR:
+        break;
+    }
+  };
+  free(output_buffer);
+}
+
+void output_buffer_push(struct_data* data){
+  if (output_buffer_length == output_buffer_size) {
+    output_buffer = realloc(output_buffer, sizeof(struct_data) * 2 * output_buffer_size);
+    if (output_buffer == NULL) extern_out_of_memory();
+  }
+  output_buffer[output_buffer_length] = *data;
+  output_buffer_length++;
+}
+
 /* Exception raising, with cleanup */
 
 static void extern_out_of_memory(void)
 {
   extern_replay_trail();
-//   free_extern_output();
+  output_buffer_clear();
   caml_raise_out_of_memory();
 }
 
@@ -210,4 +252,19 @@ static void extern_rec(value v)
     }
     }
   }
+}
+
+// Really extern value
+
+static void extern_value(value v)
+{
+  /* Initializations */
+  init_extern_trail();
+  output_buffer_init();
+  obj_counter = 0;
+  /* Marshal the object */
+  extern_rec(v);
+  /* Undo the modifications done on externed blocks */
+  extern_replay_trail();
+  output_buffer_clear();
 }
