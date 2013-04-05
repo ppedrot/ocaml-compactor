@@ -1,0 +1,6 @@
+This library uses Hopcroft algorithm to minimize Coq file objects.
+It is adaptable to any OCaml structure easily.
+
+
+Hopcroft implementation is taken from:
+http://arxiv.org/abs/0802.2826
