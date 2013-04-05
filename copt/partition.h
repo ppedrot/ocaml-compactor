@@ -1,5 +1,3 @@
-struct partition;
-
 #define set int
 
 typedef struct partition partition;

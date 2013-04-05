@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include "buffer.h"
-#include "partition.h"
 #include "hopcroft.h"
 
 #define BUFFER_SIZE 97

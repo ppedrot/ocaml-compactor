@@ -1,3 +1,5 @@
+#include "partition.h"
+
 typedef struct intfield {
   int intfield_num;
   int intfield_val;

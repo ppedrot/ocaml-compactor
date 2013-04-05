@@ -1,6 +1,5 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include "partition.h"
 #include "hopcroft.h"
 
 void print_reduced() {
