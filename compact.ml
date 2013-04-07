@@ -10,7 +10,30 @@ type transition =
 module TransitionOrd =
 struct
   type t = transition
-  let compare = Pervasives.compare
+  let int_compare (x : int) y = Pervasives.compare x y
+  let str_compare (x : string) y = Pervasives.compare x y
+
+  let compare t1 t2 = match t1, t2 with
+  | StringT s1, StringT s2 -> str_compare s1 s2
+  | TagT t1, TagT t2 -> int_compare t1 t2
+  | AtomT (n1, t1), AtomT (n2, t2) ->
+    let c = int_compare n1 n2 in
+    if c = 0 then int_compare t1 t2 else c
+  | PFieldT n1, PFieldT n2 -> int_compare n1 n2
+  | IFieldT (n1, i1), IFieldT (n2, i2) ->
+    let c = int_compare n1 n2 in
+    if c = 0 then int_compare i1 i2 else c
+
+  | StringT _, (TagT _ | AtomT (_, _) | PFieldT _ | IFieldT (_, _)) -> -1
+  | TagT _, (AtomT (_, _) | PFieldT _ | IFieldT (_, _)) -> -1
+  | AtomT (_, _), (PFieldT _ | IFieldT (_, _)) -> -1
+  | PFieldT _, (IFieldT (_, _)) -> -1
+
+  | TagT _, (StringT _) -> 1
+  | AtomT (_, _), (StringT _ | TagT _) -> 1
+  | PFieldT _, (StringT _ | TagT _ | AtomT (_, _)) -> 1
+  | IFieldT (_, _), (StringT _ | TagT _ | AtomT (_, _) | PFieldT _) -> 1
+
 end
 
 module HC = Hopcroft.Make(TransitionOrd)
