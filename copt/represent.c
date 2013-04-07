@@ -29,6 +29,7 @@
 
 #define Colornum_hd(hd) ((color_t) (((hd) >> 8) & 3))
 #define Coloredhd_hd(hd,colnum) (((hd) & ~Caml_black) | ((colnum) << 8))
+#define Color_hd(hd) ((color_t) ((hd) & Caml_black))
 
 static uintnat obj_counter;  /* Number of objects emitted so far */
 
@@ -125,8 +126,22 @@ static struct_data* output_buffer;
 static int output_buffer_size; /* Real size */
 static int output_buffer_length; /* Current occupation */
 
-void value_data_clear(value_data* data) {
-  // TODO;
+void tbl_struct_clear(tbl_struct* tbl) {
+  size_t i;
+  for (i = 0; i < (tbl->tbl_value_len); i++) {
+    value_data val = (tbl->tbl_value_tbl)[i];
+    switch(val.value_data_tag) {
+      case VAL_INT:
+        break;
+      case VAL_PTR:
+        break;
+      case VAL_ABS:
+        // This is an abstract value so we unregister it
+        caml_remove_global_root(val.value_data_val.abs_val);
+        break;
+    }
+  }
+  free(tbl->tbl_value_tbl);
 }
 
 void output_buffer_init() {
@@ -139,22 +154,28 @@ void output_buffer_init() {
 void output_buffer_clear() {
   int i;
   for(i = 0; i < output_buffer_length; i++) {
+    union struct_field val = output_buffer[i].struct_data_val;
     switch(output_buffer[i].struct_data_tag) {
       case STRUCT_TBL:
-        value_data_clear(output_buffer[i].struct_data_val.tbl_val.tbl_value_tbl);
+        tbl_struct_clear(&(val.tbl_val));
         break;
       case STRUCT_STR:
+        caml_remove_global_root(val.str_val);
         break;
     }
   };
   free(output_buffer);
 }
 
-void output_buffer_push(struct_data* data){
+void output_buffer_resize() {
   if (output_buffer_length == output_buffer_size) {
     output_buffer = realloc(output_buffer, sizeof(struct_data) * 2 * output_buffer_size);
     if (output_buffer == NULL) extern_out_of_memory();
   }
+}
+
+void output_buffer_push(struct_data* data){
+  output_buffer_resize();
   output_buffer[output_buffer_length] = *data;
   output_buffer_length++;
 }

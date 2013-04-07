@@ -39,10 +39,7 @@ typedef enum {
   STRUCT_STR, // String
 } struct_tag;
 
-typedef struct str_struct {
-  size_t str_value_len;
-  char* str_value_val;
-} str_struct;
+typedef value* str_struct;
 /* OCaml string */
 
 typedef struct tbl_struct {
