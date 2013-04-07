@@ -105,11 +105,11 @@ let main () =
   (* magic number *)
   let magic = input_binary_int in_chan in
   (* library *)
-  let (libobj, libmem) = parse in_chan in
+  let (libobj, libmem) = parse_channel in_chan in
   (* digest *)
   let digest = Marshal.from_channel in_chan in
   (* table *)
-  let (tableobj, tablemem) = parse in_chan in
+  let (tableobj, tablemem) = parse_channel in_chan in
   let () = close_in in_chan in
   (** Reduce phase *)
   let (libobj, libmem) = reduce libobj libmem in

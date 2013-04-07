@@ -1,3 +1,5 @@
+(** Headers *)
+
 let prefix_small_block =         0x80
 let prefix_small_int =           0x40
 let prefix_small_string =        0x20
@@ -47,6 +49,23 @@ type code_descr =
 
 let code_max = 0x13
 
+(** Memory reification *)
+
+type repr =
+| RInt of int
+| RBlock of (int * int) (* tag × len *)
+| RString of string
+| RPointer of int
+
+type data =
+| Int of int (* value *)
+| Ptr of int (* pointer *)
+| Atm of int (* tag *)
+
+type obj =
+| Struct of int * data array (* tag × data *)
+| String of string
+
 (* let input_byte (s, off) =
   let ans = Char.code (s.[!off]) in
   let () = incr off in
@@ -69,6 +88,26 @@ let input_binary_int chan =
 
 let of_string s = (s, ref 0)*)
 
+module type Input =
+sig
+  type t
+  val input_byte : t -> int
+  val input_binary_int : t -> int
+end
+
+module type S =
+sig
+  type input
+  val parse : input -> (data * obj array)
+end
+
+module Make(M : Input) =
+struct
+
+open M
+
+type input = M.t
+
 let current_offset = ref 0
 
 let input_byte chan =
@@ -81,7 +120,7 @@ let input_binary_int chan =
 
 let input_char chan =
   let () = incr current_offset in
-  input_char chan
+  Char.chr (input_byte chan)
 
 let parse_header chan =
   let () = current_offset := 0 in
@@ -92,21 +131,6 @@ let parse_header chan =
   let size32 = input_binary_int chan in
   let size64 = input_binary_int chan in
   (magic, length, size32, size64, objects)
-
-type repr =
-| RInt of int
-| RBlock of (int * int) (* tag × len *)
-| RString of string
-| RPointer of int
-
-type data =
-| Int of int (* value *)
-| Ptr of int (* pointer *)
-| Atm of int (* tag *)
-
-type obj =
-| Struct of int * data array (* tag × data *)
-| String of string
 
 let input_int8s chan =
   let i = input_byte chan in
@@ -296,3 +320,39 @@ let () =
   let chan = open_in Sys.argv.(1) in
   let _ = dump chan in
   ()*)
+
+end
+
+module IChannel =
+struct
+  type t = in_channel
+  let input_byte = Pervasives.input_byte
+  let input_binary_int = Pervasives.input_binary_int
+end
+
+module IString =
+struct
+  type t = (string * int ref)
+
+  let input_byte (s, off) =
+    let ans = Char.code (s.[!off]) in
+    let () = incr off in
+    ans
+
+  let input_binary_int chan =
+    let i = input_byte chan in
+    let j = input_byte chan in
+    let k = input_byte chan in
+    let l = input_byte chan in
+    let ans = (i lsl 24) lor (j lsl 16) lor (k lsl 8) lor l in
+    if i land 0x80 = 0
+      then ans
+      else ans lor ((-1) lsl 31)
+
+end
+
+module PChannel = Make(IChannel)
+module PString = Make(IString)
+
+let parse_channel = PChannel.parse
+let parse_string s = PString.parse (s, ref 0)
