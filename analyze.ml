@@ -118,9 +118,7 @@ let input_binary_int chan =
   let () = current_offset := !current_offset + 4 in
   input_binary_int chan
 
-let input_char chan =
-  let () = incr current_offset in
-  Char.chr (input_byte chan)
+let input_char chan = Char.chr (input_byte chan)
 
 let parse_header chan =
   let () = current_offset := 0 in
