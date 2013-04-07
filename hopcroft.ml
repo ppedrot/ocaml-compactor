@@ -230,7 +230,7 @@ let init automaton =
     for i = 0 to pred len do
       (** Each time the label changes, we split *)
       let nlbl = (Array.unsafe_get automaton.transitions i).lbl in
-      if !label <> nlbl then begin
+      if Label.compare !label nlbl <> 0 then begin
         ignore (TPartition.split pt p);
         label := nlbl
       end;
