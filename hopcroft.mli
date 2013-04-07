@@ -24,9 +24,9 @@ end
 module type S =
 sig
   type label
-  type state = int
+  type state
   val reduce : (label, state) automaton -> state list array
   (** Associate the array of equivalence classes of the states of an automaton *)
 end
 
-module Make (Label : OrderedType) : S with type label = Label.t
+module Make (Label : OrderedType) : S with type label = Label.t and type state = int

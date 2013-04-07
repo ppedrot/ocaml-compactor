@@ -64,25 +64,29 @@ let create n = {
   location = Array.init n (fun i -> i);
 }
 
+let uget (t : int array) i = Array.unsafe_get t i
+let uset (t : int array) i x = Array.unsafe_set t i x
+
 let length t = succ t.partitions
 
-let size s t = t.last.(s) - t.first.(s)
+let size s t =
+  uget t.last s - uget t.first s
 
-let partition i t = t.index.(i)
+let partition i t = uget t.index i
 
 let iter s f t =
-  let i = ref t.first.(s) in
-  while !i < t.last.(s) do
-    f t.elements.(!i);
-    incr i
+  let fst = uget t.first s in
+  let lst = uget t.last s in
+  for i = fst to lst - 1 do
+    f (uget t.elements i);
   done
 
 let iter_all f t =
   for i = 0 to t.partitions do f i; done
 
 let next i t =
-  if t.last.(t.index.(i)) < t.location.(i) then -1
-  else t.elements.(succ t.location.(i))
+  if uget t.last (uget t.index i) < uget t.location i then -1
+  else uget t.elements (succ (uget t.location i))
 
 let resize t =
   let len = Array.length t.first in
@@ -95,9 +99,9 @@ let resize t =
     let nlast = Array.make nlen 0 in
     let nmarked = Array.make nlen 0 in
     for i = 0 to pred len do
-      nfirst.(i) <- pfirst.(i);
-      nlast.(i) <- plast.(i);
-      nmarked.(i) <- pmarked.(i);
+      uset nfirst i (uget pfirst i);
+      uset nlast i (uget plast i);
+      uset nmarked i (uget pmarked i);
     done;
     t.first <- nfirst;
     t.last <- nlast;
@@ -105,39 +109,40 @@ let resize t =
   end
 
 let split s t =
-  if t.marked.(s) = t.last.(s) then t.marked.(s) <- t.first.(s);
-  if t.marked.(s) = t.first.(s) then -1
+  if uget t.marked s = uget t.last s then uset t.marked s (uget t.first s);
+  if uget t.marked s = uget t.first s then -1
+  (** Nothing to split *)
   else begin
     let len = succ t.partitions in
     t.partitions <- len;
     resize t;
-    t.first.(len) <- t.first.(s);
-    t.marked.(len) <- t.first.(s);
-    t.last.(len) <- t.marked.(s);
-    t.first.(s) <- t.marked.(s);
-    for i = t.first.(len) to pred t.last.(len) do
-      t.index.(t.elements.(i)) <- len;
+    uset t.first len (uget t.first s);
+    uset t.marked len (uget t.first s);
+    uset t.last len (uget t.marked s);
+    uset t.first s (uget t.marked s);
+    for i = uget t.first len to pred (uget t.last len) do
+      uset t.index (uget t.elements i) len;
     done;
     len
   end
 
 let mark i t =
-  let set = t.index.(i) in
-  let loc = t.location.(i) in
-  let mark = t.marked.(set) in
+  let set = uget t.index i in
+  let loc = uget t.location i in
+  let mark = uget t.marked set in
   if mark <= loc then begin
-    t.elements.(loc) <- t.elements.(mark);
-    t.location.(t.elements.(loc)) <- loc;
-    t.elements.(mark) <- i;
-    t.location.(i) <- mark;
-    t.marked.(set) <- succ mark;
+    uset t.elements loc (uget t.elements mark);
+    uset t.location (uget t.elements loc) loc;
+    uset t.elements mark i;
+    uset t.location i mark;
+    uset t.marked set (succ mark);
   end
 
-let is_marked s t = t.marked.(s) <> t.first.(s)
+let is_marked s t = (uget t.marked s) <> (uget t.first s)
 
 let is_valid s = 0 <= s
 
-let choose s t = t.elements.(t.first.(s))
+let choose s t = uget t.elements (uget t.first s)
 
 let represent s = s
 
@@ -166,12 +171,14 @@ end
 module type S =
 sig
   type label
-  type state = int
+  type state
   val reduce : (label, state) automaton -> state list array
   (** Associate the array of equivalence classes of the states of an automaton *)
 end
 
-module Make (Label : OrderedType) : S with type label = Label.t =
+module Make (Label : OrderedType) : S
+  with type label = Label.t
+  and type state = int =
 struct
 
 type label = Label.t
@@ -196,22 +203,16 @@ let reverse automaton =
   let ans = Array.make automaton.states [] in
   let add (x : int) l = (* if List.mem x l then l else *) x :: l in
   let iter i trans =
-    let l = ans.(trans.dst) in
-    ans.(trans.dst) <- add i l
+    let l = Array.unsafe_get ans trans.dst in
+    Array.unsafe_set ans trans.dst (add i l)
   in
   let () = Array.iteri iter automaton.transitions in
   ans
 
 let init automaton =
-  let compare t1 t2 =
-    let ans = Label.compare t1.lbl t2.lbl in
-    if ans = 0 then
-      let ans = Pervasives.compare t1.src t2.src in
-      if ans = 0 then Pervasives.compare t1.dst t2.dst
-      else ans
-    else ans
-  in
+  let compare t1 t2 = Label.compare t1.lbl t2.lbl in
   let () = Array.sort compare automaton.transitions in
+  (** Sort transitions according to their label *)
   let env = {
     state_partition = SPartition.create automaton.states;
     state_touched = Stack.create ();
@@ -223,19 +224,17 @@ let init automaton =
   let len = Array.length automaton.transitions in
   if len > 0 then begin
     let p = env.splitter_partition in
-    let label = ref automaton.transitions.(0).lbl in
+    let label = ref (Array.unsafe_get automaton.transitions 0).lbl in
     (** pt is initial, full partition *)
     let pt = TPartition.partition 0 p in
-    let i = ref 0 in
-    while !i < len do
+    for i = 0 to pred len do
       (** Each time the label changes, we split *)
-      let nlbl = automaton.transitions.(!i).lbl in
+      let nlbl = (Array.unsafe_get automaton.transitions i).lbl in
       if !label <> nlbl then begin
         ignore (TPartition.split pt p);
         label := nlbl
       end;
-      TPartition.mark !i p;
-      incr i
+      TPartition.mark i p;
     done;
     ignore (TPartition.split pt p);
   end;
@@ -296,7 +295,10 @@ let reduce automaton =
   let mapping = Array.create (SPartition.length ans.state_partition) [] in
   let iter set =
     let pi = SPartition.represent set in
-    let iter i = mapping.(pi) <- i :: mapping.(pi) in
+    let iter i =
+      let map = Array.unsafe_get mapping pi in
+      Array.unsafe_set mapping pi (i :: map)
+    in
     SPartition.iter set iter ans.state_partition
   in
   let () = SPartition.iter_all iter ans.state_partition in
