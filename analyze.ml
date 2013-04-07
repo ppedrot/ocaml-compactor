@@ -1,18 +1,51 @@
-let prefix_small_block = 0x80
-let prefix_small_int = 0x40
-let prefix_small_string = 0x20
+let prefix_small_block =         0x80
+let prefix_small_int =           0x40
+let prefix_small_string =        0x20
 
-let code_int8 = 0x00
-let code_int16 = 0x01
-let code_int32 = 0x02
-let code_int64 = 0x03
-let code_shared8 = 0x04
-let code_shared16 = 0x05
-let code_shared32 = 0x06
-let code_block32 = 0x8
-let code_block64 = 0x13
-let code_string8 = 0x9
-let code_string32 = 0xA
+let code_int8 =                  0x00
+let code_int16 =                 0x01
+let code_int32 =                 0x02
+let code_int64 =                 0x03
+let code_shared8 =               0x04
+let code_shared16 =              0x05
+let code_shared32 =              0x06
+let code_double_array32_little = 0x07
+let code_block32 =               0x08
+let code_string8 =               0x09
+let code_string32 =              0x0A
+let code_double_big =            0x0B
+let code_double_little =         0x0C
+let code_double_array8_big =     0x0D
+let code_double_array8_little =  0x0E
+let code_double_array32_big =    0x0F
+let code_codepointer =           0x10
+let code_infixpointer =          0x11
+let code_custom =                0x12
+let code_block64 =               0x13
+
+type code_descr =
+| CODE_INT8
+| CODE_INT16
+| CODE_INT32
+| CODE_INT64
+| CODE_SHARED8
+| CODE_SHARED16
+| CODE_SHARED32
+| CODE_DOUBLE_ARRAY32_LITTLE
+| CODE_BLOCK32
+| CODE_STRING8
+| CODE_STRING32
+| CODE_DOUBLE_BIG
+| CODE_DOUBLE_LITTLE
+| CODE_DOUBLE_ARRAY8_BIG
+| CODE_DOUBLE_ARRAY8_LITTLE
+| CODE_DOUBLE_ARRAY32_BIG
+| CODE_CODEPOINTER
+| CODE_INFIXPOINTER
+| CODE_CUSTOM
+| CODE_BLOCK64
+
+let code_max = 0x13
 
 (* let input_byte (s, off) =
   let ans = Char.code (s.[!off]) in
@@ -165,31 +198,34 @@ let parse_object chan =
   else if prefix_small_string <= data then
     let len = data land 0x1F in
     RString (input_string len chan)
-  else if data = code_int8 then
+  else if data > code_max then
+    assert false
+  else match (Obj.magic data) with
+  | CODE_INT8 ->
     RInt (input_int8s chan)
-  else if data = code_int16 then
+  | CODE_INT16 ->
     RInt (input_int16s chan)
-  else if data = code_int32 then
+  | CODE_INT32 ->
     RInt (input_int32s chan)
-  else if data = code_int64 then
+  | CODE_INT64 ->
     RInt (input_int64s chan)
-  else if data = code_shared8 then
+  | CODE_SHARED8 ->
     RPointer (input_int8u chan)
-  else if data = code_shared16 then
+  | CODE_SHARED16 ->
     RPointer (input_int16u chan)
-  else if data = code_shared32 then
+  | CODE_SHARED32 ->
     RPointer (input_int32u chan)
-  else if data = code_block32 then
+  | CODE_BLOCK32 ->
     RBlock (input_header32 chan)
-  else if data = code_block64 then
+  | CODE_BLOCK64 ->
     RBlock (input_header64 chan)
-  else if data = code_string8 then
+  | CODE_STRING8 ->
     let len = input_int8u chan in
     RString (input_string len chan)
-  else if data = code_string32 then
+  | CODE_STRING32 ->
     let len = input_int32u chan in
     RString (input_string len chan)
-  else
+  | _ ->
     (Printf.eprintf "Unknown code %04x\n%!" data; assert false)
 
 let parse_data len chan =
