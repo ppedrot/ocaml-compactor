@@ -148,20 +148,6 @@ let represent s = s
 
 end
 
-type ('label, 'state) transition = {
-  lbl : 'label;
-  src : 'state;
-  dst : 'state;
-}
-type ('label, 'state) automaton = {
-  states : int;
-  (** The number of states of the automaton *)
-  final_states : 'state array;
-  (** The final states *)
-  transitions : ('label, 'state) transition array;
-  (** The transitions of the automaton without duplicates *)
-}
-
 module type OrderedType =
 sig
   type t
@@ -172,7 +158,21 @@ module type S =
 sig
   type label
   type state
-  val reduce : (label, state) automaton -> state list array
+  type transition = {
+    lbl : label;
+    src : state;
+    dst : state;
+  }
+  type automaton = {
+    states : int;
+    (** The number of states of the automaton *)
+    final_states : state array;
+    (** The final states *)
+    transitions : transition array;
+    (** The transitions of the automaton without duplicates *)
+  }
+
+  val reduce : automaton -> state list array
   (** Associate the array of equivalence classes of the states of an automaton *)
 end
 
@@ -183,6 +183,18 @@ struct
 
 type label = Label.t
 type state = int
+
+type transition = {
+  lbl : label;
+  src : state;
+  dst : state;
+}
+
+type automaton = {
+  states : int;
+  final_states : state array;
+  transitions : transition array;
+}
 
 (** Partitions of states *)
 module SPartition : PartitionSig = Partition

@@ -69,7 +69,7 @@ let to_automaton obj mem =
   let size = Array.length mem in
   let transitions = ref [] in
   let push lbl src dst =
-    let t = { Hopcroft.lbl = lbl; src = src; dst = dst } in
+    let t = { HC.lbl = lbl; src = src; dst = dst } in
     transitions := t :: !transitions
   in
   let iter ptr = function
@@ -85,7 +85,7 @@ let to_automaton obj mem =
     push (StringT s) ptr ptr
   in
   let () = Array.iteri iter mem in
-  { Hopcroft.states = size;
+  { HC.states = size;
     transitions = Array.of_list !transitions;
     final_states = [||]; }
 
