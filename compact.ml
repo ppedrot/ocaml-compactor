@@ -49,6 +49,7 @@ let normalize obj mem cl =
   let canonical content = match content with
   | Int _ | Atm _ -> content
   | Ptr p -> Ptr assoc.(p)
+  | Fun _ -> assert false
   in
   (** Fill the new memory with canonical names *)
   let iter idx cli =
@@ -79,6 +80,7 @@ let to_automaton obj mem =
     | Int n -> push (IFieldT (i, n)) ptr ptr
     | Ptr q -> push (PFieldT i) ptr q
     | Atm t -> push (AtomT (i, t)) ptr ptr
+    | Fun _ -> assert false
     in
     Array.iteri iter value
   | String s ->
@@ -107,6 +109,7 @@ let represent obj mem =
   | Int n -> Obj.repr n
   | Ptr p -> data.(p)
   | Atm t -> Obj.new_block t 0
+  | Fun _ -> assert false
   in
   let iter ptr = function
   | String _ -> ()

@@ -2,6 +2,7 @@ type data =
 | Int of int
 | Ptr of int
 | Atm of int (* tag *)
+| Fun of int (* address *)
 
 type obj =
 | Struct of int * data array (* tag × data *)

@@ -13,6 +13,7 @@ let pr_data chan = function
 | Int i -> Printf.fprintf chan "i:%i" i
 | Ptr ptr -> Printf.fprintf chan "p:0x%08x" ptr
 | Atm tag -> Printf.fprintf chan "atom:0x%02x" tag
+| Fun add -> Printf.fprintf chan "fun:0x%x" add
 
 let pr_obj chan = function
 | Struct (i, [|x|]) ->
@@ -50,7 +51,7 @@ let pr_dot_obj ptr chan = function
   let pr_field i c =
   let cp = match c with
   | Int i -> string_of_int i
-  | Atm _ | Ptr _ -> "_"
+  | Atm _ | Ptr _ | Fun _ -> "_"
   in
     Printf.sprintf "<f%i>%s" i cp
   in
@@ -71,6 +72,8 @@ let pr_dot_link test ptr chan = function
     | Atm tag ->
       Printf.fprintf chan "struct_%08x:f%i -> atom_%02x;\n" ptr i tag
     | Int _ -> ()
+    | Fun add ->
+      Printf.fprintf chan "struct_%08x:f%i -> code_%02x;\n" ptr i add
   done
 | _ -> ()
 

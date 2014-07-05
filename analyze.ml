@@ -56,11 +56,13 @@ type repr =
 | RBlock of (int * int) (* tag × len *)
 | RString of string
 | RPointer of int
+| RCode of int
 
 type data =
 | Int of int (* value *)
 | Ptr of int (* pointer *)
 | Atm of int (* tag *)
+| Fun of int (* address *)
 
 type obj =
 | Struct of int * data array (* tag × data *)
@@ -247,6 +249,10 @@ let parse_object chan =
   | CODE_STRING32 ->
     let len = input_int32u chan in
     RString (input_string len chan)
+  | CODE_CODEPOINTER ->
+    let addr = input_int32u chan in
+    for i = 0 to 15 do ignore (input_byte chan); done;
+    RCode addr
   | _ ->
     (Printf.eprintf "Unknown code %04x\n%!" data; assert false)
 
@@ -302,6 +308,9 @@ let parse chan =
     let () = memory.(!current_object) <- Struct (tag, block) in
     let () = decr current_object in
     let accu = take block 0 len accu in
+    fill (data :: accu) mem
+  | RCode addr :: mem ->
+    let data = Fun addr in
     fill (data :: accu) mem
   in
   let obj = fill [] stream in
