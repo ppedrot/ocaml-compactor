@@ -171,26 +171,33 @@ let input_int32u chan =
   (i lsl 24) lor (j lsl 16) lor (k lsl 8) lor l
 
 let input_int64s chan =
-(*  let i = input_byte chan in
+  let i = input_byte chan in
   let j = input_byte chan in
   let k = input_byte chan in
   let l = input_byte chan in
   let m = input_byte chan in
   let n = input_byte chan in
   let o = input_byte chan in
-  let p = input_byte chan in*)
-  assert false
+  let p = input_byte chan in
+  let ans =
+    (i lsl 56) lor (j lsl 48) lor (k lsl 40) lor (l lsl 32) lor
+    (m lsl 24) lor (n lsl 16) lor (o lsl 8) lor p
+  in
+  if i land 0x80 = 0
+    then ans
+    else ans lor ((-1) lsl 63)
 
 let input_int64u chan =
-(*  let i = input_byte chan in
+  let i = input_byte chan in
   let j = input_byte chan in
   let k = input_byte chan in
   let l = input_byte chan in
   let m = input_byte chan in
   let n = input_byte chan in
   let o = input_byte chan in
-  let p = input_byte chan in*)
-  assert false
+  let p = input_byte chan in
+  (i lsl 56) lor (j lsl 48) lor (k lsl 40) lor (l lsl 32) lor
+  (m lsl 24) lor (n lsl 16) lor (o lsl 8) lor p
 
 let input_header32 chan =
   let i = input_byte chan in
