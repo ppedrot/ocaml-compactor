@@ -57,7 +57,12 @@ let pr_dot_obj ptr chan = function
   in
   let fields = Array.mapi pr_field v in
   let fields = String.concat "|" (Array.to_list fields) in
-  Printf.fprintf chan "[label=\"struct:%08x::%i|%s\"]" ptr i fields
+  let color =
+    if i = Obj.lazy_tag then "fillcolor=\"darkviolet\", style=\"filled\""
+    else if i = Obj.closure_tag then "fillcolor=\"gold\", style=\"filled\""
+    else ""
+  in
+  Printf.fprintf chan "[label=\"struct:%08x::%i|%s\"%s]" ptr i fields color
 | String s ->
   Printf.fprintf chan "[label=\"string:%08x\", fillcolor=\"green\", style=\"filled\"]" ptr
 
