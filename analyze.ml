@@ -49,6 +49,8 @@ type code_descr =
 
 let code_max = 0x13
 
+let magic_number = "\132\149\166\190"
+
 (** Memory reification *)
 
 type repr =
@@ -272,7 +274,8 @@ let parse_data len chan =
   parse []
 
 let parse chan =
-  let (_, len, _, _, _) = parse_header chan in
+  let (magic, len, _, _, _) = parse_header chan in
+  let () = assert (magic = magic_number) in
   parse_data len chan
 
 let rec take value off len l =
@@ -284,7 +287,8 @@ let rec take value off len l =
     take value (succ off) len l
 
 let parse chan =
-  let (_, len, _, _, size) = parse_header chan in
+  let (magic, len, _, _, size) = parse_header chan in
+  let () = assert (magic = magic_number) in
   let stream = parse_data len chan in
   let memory = Array.make size (Struct ((-1), [||])) in
   let current_object = ref (pred size) in
