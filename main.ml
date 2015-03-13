@@ -1,41 +1,43 @@
 open Analyze
 open Compact
 
+(** Ignore leading position information and trailing digest *)
+let parse_channel chan =
+  let _ = input_binary_int chan in
+  let data = parse_channel chan in
+  let _ = Digest.input chan in
+  data
+
+let marshal_out_segment f ch v =
+  let start = pos_out ch in
+  output_binary_int ch 0;
+  Marshal.to_channel ch v [];
+  let stop = pos_out ch in
+  seek_out ch start;
+  output_binary_int ch stop;
+  seek_out ch stop;
+  Digest.output ch (Digest.file f)
+
 let main () =
   let in_file = Sys.argv.(1) in
-  let out_file = in_file in
   (** Input phase *)
 (*   let () = Printf.eprintf "unmarshalling...\n%!" in *)
   let in_chan = open_in in_file in
+  let (out_file, out_chan) = Filename.open_temp_file "compact" "" in
   (* magic number *)
   let magic = input_binary_int in_chan in
-  (* library *)
-  let (libobj, libmem) = parse_channel in_chan in
-  (* digest *)
-  let digest = Marshal.from_channel in_chan in
-  (* table *)
-  let (tableobj, tablemem) = parse_channel in_chan in
-  let () = close_in in_chan in
-  (** Reduce phase *)
-  let (libobj, libmem) = reduce libobj libmem in
-  let libobj = represent libobj libmem in
-  let (tableobj, tablemem) = reduce tableobj tablemem in
-  let tableobj = represent tableobj tablemem in
-  (** Output phase *)
-  let out_chan = open_out out_file in
-  (** magic number *)
   let () = output_binary_int out_chan magic in
-  (** library *)
+  (* segments; there are 5 of them in 8.5 *)
+  for i = 0 to 4 do
 (*   let () = Printf.eprintf "library: %i objects\n%!" (Array.length libmem) in *)
 (*   let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length libmem) in *)
-  let () = Marshal.to_channel out_chan libobj [] in
-  (** digest *)
-  let () = Marshal.to_channel out_chan digest [] in
-  (** table *)
-(*   let () = Printf.eprintf "table: %i objects\n%!" (Array.length tablemem) in *)
-(*   let () = Printf.eprintf "compact table: %i objects\n%!" (Array.length tablemem) in *)
-  let () = Marshal.to_channel out_chan tableobj [] in
+    let (obj, mem) = parse_channel in_chan in
+    let (obj, mem) = reduce obj mem in
+    let obj = represent obj mem in
+    marshal_out_segment out_file out_chan obj
+  done;
   (* closing all *)
+  close_in in_chan;
   close_out out_chan
 
 let () = main ()
