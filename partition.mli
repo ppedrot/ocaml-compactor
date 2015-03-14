@@ -49,4 +49,4 @@ val represent : set -> int
 
 end
 
-module Make(M : sig end) : S
+include S

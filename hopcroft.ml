@@ -47,10 +47,10 @@ type automaton = {
 }
 
 (** Partitions of states *)
-module SPartition = Partition.Make(struct end)
+module SPartition : Partition.S = Partition
 
 (** Partitions of transitions *)
-module TPartition = Partition.Make(struct end)
+module TPartition : Partition.S = Partition
 
 type environment = {
   state_partition : SPartition.t;

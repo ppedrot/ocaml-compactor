@@ -18,7 +18,7 @@ sig
   val represent : set -> int
 end
 
-module Make(M : sig end) =
+module Impl =
 struct
 
 type set = int
@@ -135,3 +135,5 @@ let choose s t = uget t.elements (uget t.first s)
 let represent s = s
 
 end
+
+include Impl
