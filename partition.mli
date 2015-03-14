@@ -43,7 +43,9 @@ val choose : set -> t -> int
 (** Choose any element of a partition *)
 
 val represent : set -> int
-(** Associate a unique number to each partition *)
+(** Associate a unique number to each partition. If the partition is valid, then
+    the returned number is guaranteed to be between [0] and [len - 1] when
+    [len] is the number of partitions of the structure. *)
 
 end
 
