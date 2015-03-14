@@ -2,13 +2,13 @@ open Analyze
 open Compact
 
 (** Ignore leading position information and trailing digest *)
-let parse_channel chan =
+let parse_segment chan =
   let _ = input_binary_int chan in
-  let data = parse_channel chan in
-  let _ = Digest.input chan in
-  data
+  let (obj, mem) = parse_channel chan in
+  let digest = Digest.input chan in
+  (obj, mem, digest)
 
-let marshal_out_segment f ch v =
+let marshal_out_segment f ch v digest =
   let start = pos_out ch in
   output_binary_int ch 0;
   Marshal.to_channel ch v [];
@@ -16,7 +16,7 @@ let marshal_out_segment f ch v =
   seek_out ch start;
   output_binary_int ch stop;
   seek_out ch stop;
-  Digest.output ch (Digest.file f)
+  Digest.output ch digest
 
 let filecopy src dst =
   let buffer = String.create 1024 in
@@ -44,10 +44,10 @@ let main () =
   for i = 0 to 4 do
 (*   let () = Printf.eprintf "library: %i objects\n%!" (Array.length libmem) in *)
 (*   let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length libmem) in *)
-    let (obj, mem) = parse_channel in_chan in
+    let (obj, mem, digest) = parse_segment in_chan in
     let (obj, mem) = reduce obj mem in
     let obj = represent obj mem in
-    marshal_out_segment out_file out_chan obj
+    marshal_out_segment out_file out_chan obj digest
   done;
   (* closing all *)
   close_in in_chan;
