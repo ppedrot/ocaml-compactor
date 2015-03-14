@@ -24,6 +24,10 @@ sig
 
   val reduce : automaton -> state list array
   (** Associate the array of equivalence classes of the states of an automaton *)
+
+  module SPartition : Partition.S
+
+  val reduce_partition : automaton -> SPartition.t
 end
 
 module Make (Label : OrderedType) : S
@@ -165,6 +169,10 @@ let reduce automaton =
   in
   let () = SPartition.iter_all iter ans.state_partition in
   mapping
+
+  let reduce_partition automaton =
+    let (ans, _) = reduce_aux automaton in
+    ans.state_partition
 
 end
 (*     Printf.printf "%i ~ { " (SPartition.represent set);
