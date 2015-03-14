@@ -47,7 +47,8 @@ let main () =
     let (obj, mem, digest) = parse_segment in_chan in
     let (obj, mem) = reduce obj mem in
     let obj = represent obj mem in
-    marshal_out_segment out_file out_chan obj digest
+    marshal_out_segment out_file out_chan obj digest;
+    Gc.compact ()
   done;
   (* closing all *)
   close_in in_chan;

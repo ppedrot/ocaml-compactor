@@ -77,7 +77,7 @@ let reverse automaton =
 
 let init automaton =
   let compare t1 t2 = Label.compare t1.lbl t2.lbl in
-  let () = Array.sort compare automaton.transitions in
+  let () = Array.fast_sort compare automaton.transitions in
   (** Sort transitions according to their label *)
   let env = {
     state_partition = SPartition.create automaton.states;
