@@ -39,29 +39,28 @@ end
 module HC = Hopcroft.Make(TransitionOrd)
 
 let normalize obj mem cl =
-  let size = Array.length mem in
-  (** [assoc.(i)] contains the equivalence class of [i]. *)
-  let assoc = Array.make size (-1) in
-  let iter cli elts = List.iter (fun i -> assoc.(i) <- cli) elts in
-  let () = Array.iteri iter cl in
+  let open HC in
   (** Initialize the new memory with dummy values *)
-  let compact_mem = Array.make (Array.length cl) (Struct (-1, [||])) in
+  let compact_mem = Array.make (SPartition.length cl) (Struct (-1, [||])) in
   let canonical content = match content with
   | Int _ | Atm _ -> content
-  | Ptr p -> Ptr assoc.(p)
+  | Ptr p ->
+    let repr = SPartition.partition p cl in
+    Ptr (SPartition.represent repr)
   | Fun _ -> assert false
   in
   (** Fill the new memory with canonical names *)
-  let iter idx cli =
+  let iter set =
+    let idx = SPartition.represent set in
     (** Choose an element *)
-    let repr = List.hd cli in
+    let repr = SPartition.choose set cl in
     let data = match mem.(repr) with
     | Struct (tag, value) -> Struct (tag, Array.map canonical value)
     | String s -> String s
     in
     compact_mem.(idx) <- data
   in
-  let () = Array.iteri iter cl in
+  let () = SPartition.iter_all iter cl in
   (** Return canonical entry point and compacted memory *)
   (canonical obj, compact_mem)
 
@@ -95,7 +94,7 @@ let reduce obj mem =
   if Array.length mem = 0 then (obj, mem)
   else
     let automaton = to_automaton obj mem in
-    let reduced = HC.reduce automaton in
+    let reduced = HC.reduce_partition automaton in
     normalize obj mem reduced
 
 let represent obj mem =
