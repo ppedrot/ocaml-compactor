@@ -38,7 +38,10 @@ let main () =
   done;
   (* closing all *)
   close_in in_chan;
-  close_out out_chan
+  close_out out_chan;
+  (* renaming the file *)
+  Sys.remove in_file;
+  Sys.rename out_file in_file
 
 let () = main ()
 
