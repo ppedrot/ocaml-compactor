@@ -273,11 +273,6 @@ let parse_data len chan =
   in
   parse []
 
-let parse chan =
-  let (magic, len, _, _, _) = parse_header chan in
-  let () = assert (magic = magic_number) in
-  parse_data len chan
-
 let rec take value off len l =
   if len <= off then l
   else match l with
