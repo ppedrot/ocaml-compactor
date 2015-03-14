@@ -265,62 +265,55 @@ let parse_object chan =
   | _ ->
     (Printf.eprintf "Unknown code %04x\n%!" data; assert false)
 
-let parse_data len chan =
-  let () = current_offset := 0 in
-  let rec parse accu =
-    if len <= !current_offset then accu
-    else parse (parse_object chan :: accu)
-  in
-  parse []
-
-let rec take value off len l =
-  if len <= off then l
-  else match l with
-  | [] -> assert false
-  | x :: l ->
-    value.(off) <- x;
-    take value (succ off) len l
-
 let parse chan =
   let (magic, len, _, _, size) = parse_header chan in
   let () = assert (magic = magic_number) in
-  let stream = parse_data len chan in
   let memory = Array.make size (Struct ((-1), [||])) in
-  let current_object = ref (pred size) in
-  let rec fill accu = function
-  | [] ->
-    begin match accu with
-    | [obj] -> obj
-    | _ -> assert false
-    end
-  | RPointer n :: mem ->
-    let data = Ptr (!current_object - n + 1) in
-    fill (data :: accu) mem
-  | RInt n :: mem ->
+  let current_object = ref 0 in
+  let fill_obj = function
+  | RPointer n ->
+    let data = Ptr (!current_object - n) in
+    data, None
+  | RInt n ->
     let data = Int n in
-    fill (data :: accu) mem
-  | RString s :: mem ->
+    data, None
+  | RString s ->
     let data = Ptr !current_object in
     let () = memory.(!current_object) <- String s in
-    let () = decr current_object in
-    fill (data :: accu) mem
-  | RBlock (tag, 0) :: mem ->
+    let () = incr current_object in
+    data, None
+  | RBlock (tag, 0) ->
     (* Atoms are never shared *)
     let data = Atm tag in
-    fill (data :: accu) mem
-  | RBlock (tag, len) :: mem ->
+    data, None
+  | RBlock (tag, len) ->
     let data = Ptr !current_object in
-    let block = Array.make len (Atm (-1)) in
-    let () = memory.(!current_object) <- Struct (tag, block) in
-    let () = decr current_object in
-    let accu = take block 0 len accu in
-    fill (data :: accu) mem
-  | RCode addr :: mem ->
+    let nblock = Array.make len (Atm (-1)) in
+    let () = memory.(!current_object) <- Struct (tag, nblock) in
+    let () = incr current_object in
+    data, Some nblock
+  | RCode addr ->
     let data = Fun addr in
-    fill (data :: accu) mem
+    data, None
   in
-  let obj = fill [] stream in
-  (obj, memory)
+
+  let rec fill block off accu =
+    if Array.length block = off then
+      match accu with
+      | [] -> ()
+      | (block, off) :: accu -> fill block off accu
+    else
+      let data, nobj = fill_obj (parse_object chan) in
+      let () = block.(off) <- data in
+      let block, off, accu = match nobj with
+      | None -> block, succ off, accu
+      | Some nblock -> nblock, 0, ((block, succ off) :: accu)
+      in
+      fill block off accu
+  in
+  let ans = [|Atm (-1)|] in
+  let () = fill ans 0 [] in
+  (ans.(0), memory)
 
 (*let dump chan =
   let magic = input_binary_int chan in
