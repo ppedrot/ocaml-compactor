@@ -18,6 +18,19 @@ let marshal_out_segment f ch v =
   seek_out ch stop;
   Digest.output ch (Digest.file f)
 
+let filecopy src dst =
+  let buffer = String.create 1024 in
+  let break = ref true in
+  let out_chan = open_out dst in
+  let in_chan = open_in src in
+  while !break do
+    let len = input in_chan buffer 0 1024 in
+    let () = output out_chan buffer 0 len in
+    if len = 0 then break := false
+  done;
+  close_in in_chan;
+  close_out out_chan
+
 let main () =
   let in_file = Sys.argv.(1) in
   (** Input phase *)
@@ -41,7 +54,8 @@ let main () =
   close_out out_chan;
   (* renaming the file *)
   Sys.remove in_file;
-  Sys.rename out_file in_file
+  filecopy out_file in_file;
+  Sys.remove out_file
 
 let () = main ()
 
