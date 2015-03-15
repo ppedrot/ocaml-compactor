@@ -24,6 +24,10 @@ val partition : int -> t -> set
 val iter : set -> (int -> unit) -> t -> unit
 (** Iter on elements of a partition. Don't [mark] and [split] in the loop! *)
 
+val fold : set -> (int -> 'a -> 'a) -> t -> 'a -> 'a
+(** Fold left to right on elements of a partition. Don't [mark] and [split] in
+    the loop! *)
+
 val iter_all : (set -> unit) -> t -> unit
 (** Iter on partitions. Don't [mark] and [split] in the loop! *)
 
