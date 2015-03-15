@@ -97,7 +97,7 @@ let normalize_obj obj mem cl =
     | Struct (tag, value) ->
       let idx = SPartition.represent set in
       let obj = compact_mem.(idx) in
-      for i = 0 to Array.length value do
+      for i = 0 to pred (Array.length value) do
         Obj.set_field obj i (canonical value.(i))
       done
     | String _ -> ()
