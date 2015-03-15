@@ -58,7 +58,6 @@ module TPartition : Partition.S = Partition
 
 type environment = {
   state_partition : SPartition.t;
-  state_touched : SPartition.set Stack.t;
   splitter_partition : TPartition.t;
   splitter_todo : TPartition.set Stack.t;
   transition_source : int array;
@@ -83,7 +82,6 @@ let init automaton =
   (** Sort transitions according to their label *)
   let env = {
     state_partition = SPartition.create automaton.states;
-    state_touched = Stack.create ();
     splitter_partition = TPartition.create len;
     splitter_todo = Stack.create ();
     transition_source = Array.create len (-1);
@@ -149,18 +147,19 @@ let reduce_aux automaton =
   let inv = reverse automaton in
   while not (Stack.is_empty env.splitter_todo) do
     let pt = Stack.pop env.splitter_todo in
-    let iter t =
+    let fold t state_touched =
       let previous = env.transition_source.(t) in
       let equiv = SPartition.partition previous env.state_partition in
-      if not (SPartition.is_marked equiv env.state_partition) then
-        Stack.push equiv env.state_touched;
-      SPartition.mark previous env.state_partition
+      let state_touched =
+        if SPartition.is_marked equiv env.state_partition then state_touched
+        else equiv :: state_touched
+      in
+      let () = SPartition.mark previous env.state_partition in
+      state_touched
     in
-    TPartition.iter pt iter env.splitter_partition;
-    while not (Stack.is_empty env.state_touched) do
-      let equiv = Stack.pop env.state_touched in
-      split_partition equiv inv env
-    done
+    let state_touched = TPartition.fold pt fold env.splitter_partition [] in
+    let iter equiv = split_partition equiv inv env in
+    List.iter iter state_touched
   done;
   (env, inv)
 
