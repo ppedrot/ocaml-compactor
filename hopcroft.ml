@@ -59,7 +59,6 @@ module TPartition : Partition.S = Partition
 type environment = {
   state_partition : SPartition.t;
   splitter_partition : TPartition.t;
-  splitter_todo : TPartition.set Stack.t;
   transition_source : int array;
 }
 
@@ -83,7 +82,6 @@ let init automaton =
   let env = {
     state_partition = SPartition.create automaton.states;
     splitter_partition = TPartition.create len;
-    splitter_todo = Stack.create ();
     transition_source = Array.create len (-1);
   } in
   (** Set the source of the transitions *)
@@ -108,16 +106,16 @@ let init automaton =
     ignore (TPartition.split pt p);
   end;
   (** Push every splitter in the todo stack *)
-  let iter pt = Stack.push pt env.splitter_todo in
-  TPartition.iter_all iter env.splitter_partition;
+  let fold pt todo = pt :: todo in
+  let splitter_todo = TPartition.fold_all fold env.splitter_partition [] in
   (** Mark every final state and split *)
   let ps = SPartition.partition 0 env.state_partition in
   let iter state = SPartition.mark state env.state_partition in
   Array.iter iter automaton.final_states;
   ignore (SPartition.split ps env.state_partition);
-  env
+  env, splitter_todo
 
-let split_partition s inv env =
+let split_partition s inv env todo =
   let p = env.state_partition in
   let r = SPartition.split s p in
   if SPartition.is_valid r then begin
@@ -135,18 +133,21 @@ let split_partition s inv env =
       List.fold_left fold accu inv.(state)
     in
     let splitter_touched = SPartition.fold r fold p [] in
-    let iter pt =
+    let fold_touched todo pt =
       let npt = TPartition.split pt env.splitter_partition in
-      if TPartition.is_valid npt then Stack.push npt env.splitter_todo
+      if TPartition.is_valid npt then npt :: todo
+      else todo
     in
-    List.iter iter splitter_touched
-  end
+    List.fold_left fold_touched todo splitter_touched
+  end else
+    todo
 
 let reduce_aux automaton =
-  let env = init automaton in
+  let env, splitter_todo = init automaton in
   let inv = reverse automaton in
-  while not (Stack.is_empty env.splitter_todo) do
-    let pt = Stack.pop env.splitter_todo in
+  let rec loop = function
+  | [] -> ()
+  | pt :: todo ->
     let fold t state_touched =
       let previous = env.transition_source.(t) in
       let equiv = SPartition.partition previous env.state_partition in
@@ -158,9 +159,11 @@ let reduce_aux automaton =
       state_touched
     in
     let state_touched = TPartition.fold pt fold env.splitter_partition [] in
-    let iter equiv = split_partition equiv inv env in
-    List.iter iter state_touched
-  done;
+    let fold_touched todo equiv = split_partition equiv inv env todo in
+    let splitter_todo = List.fold_left fold_touched todo state_touched in
+    loop splitter_todo
+  in
+  let () = loop splitter_todo in
   (env, inv)
 
 let reduce automaton =
