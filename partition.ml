@@ -11,6 +11,7 @@ sig
   val iter : set -> (int -> unit) -> t -> unit
   val fold : set -> (int -> 'a -> 'a) -> t -> 'a -> 'a
   val iter_all : (set -> unit) -> t -> unit
+  val fold_all : (set -> 'a -> 'a) -> t -> 'a -> 'a
   val mark : int -> t -> unit
   val split : set -> t -> set
   val is_marked : set -> t -> bool
@@ -81,6 +82,13 @@ let fold s f t accu =
 
 let iter_all f t =
   for i = 0 to t.partitions do f i; done
+
+let fold_all f t accu =
+  let rec fold accu i =
+    if t.partitions <= i then accu
+    else fold (f i accu) (succ i)
+  in
+  fold accu 0
 
 let next i t =
   if uget t.last (uget t.index i) < uget t.location i then -1
