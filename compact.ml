@@ -139,9 +139,14 @@ let reduce obj mem =
     normalize obj mem reduced
 
 let share obj mem =
-  let automaton = to_automaton obj mem in
-  let reduced = HC.reduce_partition automaton in
-  normalize_obj obj mem reduced
+  if Array.length mem = 0 then match obj with
+  | Int n -> Obj.repr n
+  | Atm t -> Obj.new_block t 0
+  | _ -> assert false
+  else
+    let automaton = to_automaton obj mem in
+    let reduced = HC.reduce_partition automaton in
+    normalize_obj obj mem reduced
 
 let represent obj mem =
   let init i = match mem.(i) with
