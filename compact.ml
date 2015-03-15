@@ -64,6 +64,47 @@ let normalize obj mem cl =
   (** Return canonical entry point and compacted memory *)
   (canonical obj, compact_mem)
 
+let normalize_obj obj mem cl =
+  let open HC in
+  (** Initialize the new memory with dummy values *)
+  let compact_mem = Array.make (SPartition.length cl) (Obj.repr 0) in
+  let canonical content = match content with
+  | Int i -> Obj.repr i
+  | Atm tag -> Obj.new_block tag 0
+  | Ptr p ->
+    let repr = SPartition.partition p cl in
+    compact_mem.(SPartition.represent repr)
+  | Fun _ -> assert false
+  in
+  (** Fill the memory in two passes, to ensure we get the pointers right: first
+      construct the structures. *)
+  let iter set =
+    let idx = SPartition.represent set in
+    (** Choose an element *)
+    let repr = SPartition.choose set cl in
+    let data = match mem.(repr) with
+    | Struct (tag, value) ->
+      Obj.new_block tag (Array.length value)
+    | String s -> Obj.repr s
+    in
+    compact_mem.(idx) <- data
+  in
+  let () = SPartition.iter_all iter cl in
+  (** Then set the contents of the structures *)
+  let iter set =
+    let repr = SPartition.choose set cl in
+    match mem.(repr) with
+    | Struct (tag, value) ->
+      let idx = SPartition.represent set in
+      let obj = compact_mem.(idx) in
+      for i = 0 to Array.length value do
+        Obj.set_field obj i (canonical value.(i))
+      done
+    | String _ -> ()
+  in
+  let () = SPartition.iter_all iter cl in
+  canonical obj
+
 let to_automaton obj mem =
   (** Create the automaton *)
   let size = Array.length mem in
@@ -96,6 +137,11 @@ let reduce obj mem =
     let automaton = to_automaton obj mem in
     let reduced = HC.reduce_partition automaton in
     normalize obj mem reduced
+
+let share obj mem =
+  let automaton = to_automaton obj mem in
+  let reduced = HC.reduce_partition automaton in
+  normalize_obj obj mem reduced
 
 let represent obj mem =
   let init i = match mem.(i) with
