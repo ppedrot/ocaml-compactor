@@ -62,6 +62,7 @@ type environment = {
   splitter_partition : TPartition.t;
   splitter_todo : TPartition.set Stack.t;
   splitter_touched : TPartition.set Stack.t;
+  transition_source : int array;
 }
 
 (** Associate the list of transitions ending in a given state *)
@@ -76,26 +77,32 @@ let reverse automaton =
   ans
 
 let init automaton =
+  let transitions = automaton.transitions in
   let compare t1 t2 = Label.compare t1.lbl t2.lbl in
-  let () = Array.fast_sort compare automaton.transitions in
+  let () = Array.fast_sort compare transitions in
+  let len = Array.length transitions in
   (** Sort transitions according to their label *)
   let env = {
     state_partition = SPartition.create automaton.states;
     state_touched = Stack.create ();
-    splitter_partition = TPartition.create (Array.length automaton.transitions);
+    splitter_partition = TPartition.create len;
     splitter_todo = Stack.create ();
     splitter_touched = Stack.create ();
+    transition_source = Array.create len (-1);
   } in
+  (** Set the source of the transitions *)
+  for i = 0 to pred len do
+    env.transition_source.(i) <- transitions.(i).src
+  done;
   (** Split splitters according to their label *)
-  let len = Array.length automaton.transitions in
   if len > 0 then begin
     let p = env.splitter_partition in
-    let label = ref (Array.unsafe_get automaton.transitions 0).lbl in
+    let label = ref (Array.unsafe_get transitions 0).lbl in
     (** pt is initial, full partition *)
     let pt = TPartition.partition 0 p in
     for i = 0 to pred len do
       (** Each time the label changes, we split *)
-      let nlbl = (Array.unsafe_get automaton.transitions i).lbl in
+      let nlbl = (Array.unsafe_get transitions i).lbl in
       if Label.compare !label nlbl <> 0 then begin
         ignore (TPartition.split pt p);
         label := nlbl
@@ -142,7 +149,7 @@ let reduce_aux automaton =
   while not (Stack.is_empty env.splitter_todo) do
     let pt = Stack.pop env.splitter_todo in
     let iter t =
-      let previous = automaton.transitions.(t).src in
+      let previous = env.transition_source.(t) in
       let equiv = SPartition.partition previous env.state_partition in
       if not (SPartition.is_marked equiv env.state_partition) then
         Stack.push equiv env.state_touched;
