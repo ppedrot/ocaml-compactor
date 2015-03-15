@@ -61,7 +61,6 @@ type environment = {
   state_touched : SPartition.set Stack.t;
   splitter_partition : TPartition.t;
   splitter_todo : TPartition.set Stack.t;
-  splitter_touched : TPartition.set Stack.t;
   transition_source : int array;
 }
 
@@ -87,7 +86,6 @@ let init automaton =
     state_touched = Stack.create ();
     splitter_partition = TPartition.create len;
     splitter_todo = Stack.create ();
-    splitter_touched = Stack.create ();
     transition_source = Array.create len (-1);
   } in
   (** Set the source of the transitions *)
@@ -126,21 +124,24 @@ let split_partition s inv env =
   let r = SPartition.split s p in
   if SPartition.is_valid r then begin
     let r = if SPartition.size r p < SPartition.size s p then r else s in
-    let iter state =
-      let iter trans =
+    let fold state accu =
+      let fold accu trans =
         let pt = TPartition.partition trans env.splitter_partition in
-        if not (TPartition.is_marked pt env.splitter_partition) then
-          Stack.push pt env.splitter_touched;
-        TPartition.mark trans env.splitter_partition
+        let accu =
+          if TPartition.is_marked pt env.splitter_partition then accu
+          else pt :: accu
+        in
+        let () = TPartition.mark trans env.splitter_partition in
+        accu
       in
-      List.iter iter inv.(state)
+      List.fold_left fold accu inv.(state)
     in
-    SPartition.iter r iter p;
-    while not (Stack.is_empty env.splitter_touched) do
-      let pt = Stack.pop env.splitter_touched in
+    let splitter_touched = SPartition.fold r fold p [] in
+    let iter pt =
       let npt = TPartition.split pt env.splitter_partition in
       if TPartition.is_valid npt then Stack.push npt env.splitter_todo
-    done
+    in
+    List.iter iter splitter_touched
   end
 
 let reduce_aux automaton =
