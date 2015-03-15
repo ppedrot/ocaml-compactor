@@ -40,13 +40,13 @@ type t = {
   (** keep the location of an element in [elements] *)
 }
 
-let initial_size = 97
+let initial_size n = n / 100
 
 let create n = {
   partitions = 0;
-  first = Array.create initial_size 0;
-  last = Array.create initial_size n;
-  marked = Array.create initial_size 0;
+  first = Array.create (initial_size n) 0;
+  last = Array.create (initial_size n) n;
+  marked = Array.create (initial_size n) 0;
   index = Array.create n 0;
   elements = Array.init n (fun i -> i);
   location = Array.init n (fun i -> i);
