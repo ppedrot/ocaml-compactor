@@ -45,8 +45,7 @@ let main () =
 (*   let () = Printf.eprintf "library: %i objects\n%!" (Array.length libmem) in *)
 (*   let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length libmem) in *)
     let (obj, mem, digest) = parse_segment in_chan in
-    let (obj, mem) = reduce obj mem in
-    let obj = represent obj mem in
+    let obj = share obj mem in
     marshal_out_segment out_file out_chan obj digest;
     Gc.compact ()
   done;
