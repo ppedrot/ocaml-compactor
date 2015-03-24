@@ -262,8 +262,15 @@ let parse_object chan =
     let addr = input_int32u chan in
     for i = 0 to 15 do ignore (input_byte chan); done;
     RCode addr
-  | _ ->
-    (Printf.eprintf "Unknown code %04x\n%!" data; assert false)
+  | CODE_DOUBLE_ARRAY32_LITTLE
+  | CODE_DOUBLE_BIG
+  | CODE_DOUBLE_LITTLE
+  | CODE_DOUBLE_ARRAY8_BIG
+  | CODE_DOUBLE_ARRAY8_LITTLE
+  | CODE_DOUBLE_ARRAY32_BIG
+  | CODE_INFIXPOINTER
+  |CODE_CUSTOM ->
+    Printf.eprintf "Unknown code %04x\n%!" data; exit 1
 
 let parse chan =
   let (magic, len, _, _, size) = parse_header chan in
