@@ -211,7 +211,20 @@ let input_header32 chan =
   (tag, len)
 
 let input_header64 chan =
-  assert false
+  let i = input_byte chan in
+  let j = input_byte chan in
+  let k = input_byte chan in
+  let l = input_byte chan in
+  let m = input_byte chan in
+  let n = input_byte chan in
+  let o = input_byte chan in
+  let p = input_byte chan in
+  let tag = p in
+  let len =
+    (i lsl 46) lor (j lsl 38) lor (k lsl 30) lor (l lsl 22) lor
+    (m lsl 14) lor (n lsl 6) lor (o lsr 2)
+  in
+  (tag, len)
 
 let input_string len chan =
   let ans = String.create len in
@@ -269,8 +282,8 @@ let parse_object chan =
   | CODE_DOUBLE_ARRAY8_LITTLE
   | CODE_DOUBLE_ARRAY32_BIG
   | CODE_INFIXPOINTER
-  |CODE_CUSTOM ->
-    Printf.eprintf "Unknown code %04x\n%!" data; exit 1
+  | CODE_CUSTOM ->
+    Printf.eprintf "Unknown code %04x\n%!" data; assert false
 
 let parse chan =
   let (magic, len, _, _, size) = parse_header chan in
