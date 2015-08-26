@@ -2,26 +2,23 @@ open Analyze
 
 module Fields =
 struct
-  type t =
-    int (* tag *) *
-    (int * int) list (* pairs of positions / values ordered by position *)
+  type t = int list
+    (** Lists of the form [t; f1; v1; ...; fn; vn where
+        - t is the tag of the objects
+        - fi is the position of the field
+        - vi is the value of the field
+        and the list [fi, vi] is ordered according to fi
+    *)
 
   let int_compare (x : int) y = Pervasives.compare x y
 
-  let rec list_compare l1 l2 = match l1, l2 with
+  let rec compare l1 l2 = match l1, l2 with
   | [], [] -> 0
   | [], _ :: _ -> 1
   | _ :: _, [] -> -1
-  | (xi, yi) :: li, (xj, yj) :: lj ->
+  | xi :: li, xj :: lj ->
     let c = int_compare xi xj in
-    if c <> 0 then c
-    else
-      let c = int_compare yi yj in
-      if c <> 0 then c else list_compare li lj
-
-  let compare (i, li) (j, lj) =
-    let c = int_compare i j in
-    if c <> 0 then c else list_compare li lj
+    if c <> 0 then c else compare li lj
 
 end
 
@@ -132,13 +129,13 @@ let to_automaton obj mem =
   let iter ptr = function
   | Struct (tag, value) ->
     let fold (i, accu) = function
-    | Int n -> (succ i, (i, n) :: accu)
+    | Int n -> (succ i, i :: n :: accu)
     | Ptr q -> push (PFieldT i) ptr q; (succ i, accu)
     | Atm t -> push (AtomT (i, t)) ptr ptr; (succ i, accu)
     | Fun _ -> assert false
     in
     let (_, fs) = Array.fold_left fold (0, []) value in
-    let key = (tag, fs) in
+    let key = tag :: fs in
     let old = try FieldsMap.find key !fields with Not_found -> [] in
     fields := FieldsMap.add key (ptr :: old) !fields
   | String s ->
