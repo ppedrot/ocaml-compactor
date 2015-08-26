@@ -7,11 +7,12 @@ type transition =
 | PFieldT of int (* field number *)
 | IFieldT of int * int (* field number * int value *)
 
+let int_compare (x : int) y = Pervasives.compare x y
+let str_compare (x : string) y = Pervasives.compare x y
+
 module TransitionOrd =
 struct
   type t = transition
-  let int_compare (x : int) y = Pervasives.compare x y
-  let str_compare (x : string) y = Pervasives.compare x y
 
   let compare t1 t2 = match t1, t2 with
   | StringT s1, StringT s2 -> str_compare s1 s2
@@ -37,6 +38,19 @@ struct
 end
 
 module HC = Hopcroft.Make(TransitionOrd)
+
+module HCTransitionOrd =
+struct
+  open HC
+  type t = transition
+  let compare t1 t2 =
+    let c = TransitionOrd.compare t1.lbl t2.lbl in
+    if c <> 0 then c
+    else
+      let c = int_compare t1.src t2.src in
+      if c <> 0 then c else int_compare t1.dst t2.dst
+end
+module TSet = Set.Make(HCTransitionOrd)
 
 let normalize obj mem cl =
   let open HC in
@@ -108,10 +122,10 @@ let normalize_obj obj mem cl =
 let to_automaton obj mem =
   (** Create the automaton *)
   let size = Array.length mem in
-  let transitions = ref [] in
+  let transitions = ref TSet.empty in
   let push lbl src dst =
     let t = { HC.lbl = lbl; src = src; dst = dst } in
-    transitions := t :: !transitions
+    transitions := TSet.add t !transitions
   in
   let iter ptr = function
   | Struct (tag, value) ->
@@ -127,8 +141,17 @@ let to_automaton obj mem =
     push (StringT s) ptr ptr
   in
   let () = Array.iteri iter mem in
+  let transitions =
+    try
+      let elt = TSet.choose !transitions in
+      let ans = Array.make (TSet.cardinal !transitions) elt in
+      let fold t i = ans.(i) <- t; succ i in
+      let _ = TSet.fold fold !transitions 0 in
+      ans
+    with _ -> [||]
+  in
   { HC.states = size;
-    transitions = Array.of_list !transitions;
+    transitions = transitions;
     partitions = [||]; }
 
 let reduce obj mem =

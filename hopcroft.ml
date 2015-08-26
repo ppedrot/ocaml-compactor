@@ -75,8 +75,6 @@ let reverse automaton =
 
 let init automaton =
   let transitions = automaton.transitions in
-  let compare t1 t2 = Label.compare t1.lbl t2.lbl in
-  let () = Array.fast_sort compare transitions in
   let len = Array.length transitions in
   (** Sort transitions according to their label *)
   let env = {

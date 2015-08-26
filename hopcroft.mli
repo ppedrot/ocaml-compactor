@@ -23,7 +23,8 @@ sig
         distinct. For instance, if the automaton has the list [l] as accepting
         states, one can set [partitions = [|l|]]. *)
     transitions : transition array;
-    (** The transitions of the automaton without duplicates. *)
+    (** The transitions of the automaton without duplicates. Assumes that the
+        transitions are ordred on their [lbl] component. *)
   }
 
   val reduce : automaton -> state list array
