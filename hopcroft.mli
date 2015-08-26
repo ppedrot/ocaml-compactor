@@ -15,6 +15,9 @@ sig
     src : state;
     dst : state;
   }
+
+  module TSet : Set.S with type elt = transition
+
   type automaton = {
     states : int;
     (** The number of states of the automaton. *)
@@ -22,9 +25,8 @@ sig
     (** A set of state partitions initially known to be observationally
         distinct. For instance, if the automaton has the list [l] as accepting
         states, one can set [partitions = [|l|]]. *)
-    transitions : transition array;
-    (** The transitions of the automaton without duplicates. Assumes that the
-        transitions are ordred on their [lbl] component. *)
+    transitions : TSet.t;
+    (** The transitions of the automaton. *)
   }
 
   val reduce : automaton -> state list array

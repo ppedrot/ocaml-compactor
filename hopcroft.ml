@@ -13,13 +13,16 @@ sig
     src : state;
     dst : state;
   }
+
+  module TSet : Set.S with type elt = transition
+
   type automaton = {
     states : int;
     (** The number of states of the automaton *)
     partitions : state list array;
     (** A set of state partitions *)
-    transitions : transition array;
-    (** The transitions of the automaton without duplicates *)
+    transitions : TSet.t;
+    (** The transitions of the automaton *)
   }
 
   val reduce : automaton -> state list array
@@ -44,10 +47,34 @@ type transition = {
   dst : state;
 }
 
+module TransitionOrd =
+struct
+  type t = transition
+
+  let int_compare (x : int) y = Pervasives.compare x y
+
+  let compare t1 t2 =
+    let c = Label.compare t1.lbl t2.lbl in
+    if c <> 0 then c
+    else
+      let c = int_compare t1.src t2.src in
+      if c <> 0 then c else int_compare t1.dst t2.dst
+end
+
+module TSet =
+struct
+  include Set.Make(TransitionOrd)
+
+  let iteri f s =
+    let f t i = f i t; succ i in
+    ignore (fold f s 0)
+
+end
+
 type automaton = {
   states : int;
   partitions : state list array;
-  transitions : transition array;
+  transitions : TSet.t;
 }
 
 (** Partitions of states *)
@@ -70,12 +97,12 @@ let reverse automaton =
     let l = Array.unsafe_get ans trans.dst in
     Array.unsafe_set ans trans.dst (add i l)
   in
-  let () = Array.iteri iter automaton.transitions in
+  let () = TSet.iteri iter automaton.transitions in
   ans
 
 let init automaton =
   let transitions = automaton.transitions in
-  let len = Array.length transitions in
+  let len = TSet.cardinal transitions in
   (** Sort transitions according to their label *)
   let env = {
     state_partition = SPartition.create automaton.states;
@@ -83,24 +110,24 @@ let init automaton =
     transition_source = Array.create len (-1);
   } in
   (** Set the source of the transitions *)
-  for i = 0 to pred len do
-    env.transition_source.(i) <- transitions.(i).src
-  done;
+  let iteri i trans = env.transition_source.(i) <- trans.src in
+  TSet.iteri iteri transitions;
   (** Split splitters according to their label *)
   if len > 0 then begin
     let p = env.splitter_partition in
-    let label = ref (Array.unsafe_get transitions 0).lbl in
+    let label = ref (TSet.min_elt transitions).lbl in
     (** pt is initial, full partition *)
     let pt = TPartition.partition 0 p in
-    for i = 0 to pred len do
+    let iteri i trans =
       (** Each time the label changes, we split *)
-      let nlbl = (Array.unsafe_get transitions i).lbl in
+      let nlbl = trans.lbl in
       if Label.compare !label nlbl <> 0 then begin
         ignore (TPartition.split pt p);
         label := nlbl
       end;
-      TPartition.mark i p;
-    done;
+      TPartition.mark i p
+    in
+    TSet.iteri iteri transitions;
     ignore (TPartition.split pt p);
   end;
   (** Push every splitter in the todo stack *)
