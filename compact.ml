@@ -109,10 +109,11 @@ let normalize_obj obj mem cl =
 let to_automaton obj mem =
   (** Create the automaton *)
   let size = Array.length mem in
-  let transitions = ref HC.TSet.empty in
+  let transitions = ref HC.TMap.empty in
   let push lbl src dst =
-    let t = { HC.lbl = lbl; src = src; dst = dst } in
-    transitions := HC.TSet.add t !transitions
+    let t = { HC.src = src; dst = dst } in
+    let trans = try HC.TMap.find lbl !transitions with Not_found -> [] in
+    transitions := HC.TMap.add lbl (t :: trans) !transitions
   in
   let iter ptr = function
   | Struct (tag, value) ->

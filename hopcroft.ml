@@ -9,19 +9,18 @@ sig
   type label
   type state
   type transition = {
-    lbl : label;
     src : state;
     dst : state;
   }
 
-  module TSet : Set.S with type elt = transition
+  module TMap : Map.S with type key = label
 
   type automaton = {
     states : int;
     (** The number of states of the automaton *)
     partitions : state list array;
     (** A set of state partitions *)
-    transitions : TSet.t;
+    transitions : transition list TMap.t;
     (** The transitions of the automaton *)
   }
 
@@ -42,39 +41,34 @@ type label = Label.t
 type state = int
 
 type transition = {
-  lbl : label;
   src : state;
   dst : state;
 }
 
-module TransitionOrd =
+module TMap =
 struct
-  type t = transition
+  include Map.Make(Label)
 
-  let int_compare (x : int) y = Pervasives.compare x y
+  let iteri (f : int -> Label.t -> 'a -> unit) (s : 'a list t) =
+    let rec f' lbl trans i = match trans with
+    | [] -> i
+    | t :: trans -> f i lbl t; f' lbl trans (succ i)
+    in
+    ignore (fold f' s 0)
 
-  let compare t1 t2 =
-    let c = Label.compare t1.lbl t2.lbl in
-    if c <> 0 then c
-    else
-      let c = int_compare t1.src t2.src in
-      if c <> 0 then c else int_compare t1.dst t2.dst
-end
-
-module TSet =
-struct
-  include Set.Make(TransitionOrd)
-
-  let iteri f s =
-    let f t i = f i t; succ i in
-    ignore (fold f s 0)
+  let cardinals (s : 'a list t) =
+    let rec f lbl trans i = match trans with
+    | [] -> i
+    | _ :: trans -> f lbl trans (succ i)
+    in
+    fold f s 0
 
 end
 
 type automaton = {
   states : int;
   partitions : state list array;
-  transitions : TSet.t;
+  transitions : transition list TMap.t;
 }
 
 (** Partitions of states *)
@@ -93,16 +87,16 @@ type environment = {
 let reverse automaton =
   let ans = Array.make automaton.states [] in
   let add (x : int) l = (* if List.mem x l then l else *) x :: l in
-  let iter i trans =
+  let iter i _ trans =
     let l = Array.unsafe_get ans trans.dst in
     Array.unsafe_set ans trans.dst (add i l)
   in
-  let () = TSet.iteri iter automaton.transitions in
+  let () = TMap.iteri iter automaton.transitions in
   ans
 
 let init automaton =
   let transitions = automaton.transitions in
-  let len = TSet.cardinal transitions in
+  let len = TMap.cardinals transitions in
   (** Sort transitions according to their label *)
   let env = {
     state_partition = SPartition.create automaton.states;
@@ -110,26 +104,18 @@ let init automaton =
     transition_source = Array.create len (-1);
   } in
   (** Set the source of the transitions *)
-  let iteri i trans = env.transition_source.(i) <- trans.src in
-  TSet.iteri iteri transitions;
+  let iteri i _ trans = env.transition_source.(i) <- trans.src in
+  TMap.iteri iteri transitions;
   (** Split splitters according to their label *)
-  if len > 0 then begin
-    let p = env.splitter_partition in
-    let label = ref (TSet.min_elt transitions).lbl in
-    (** pt is initial, full partition *)
-    let pt = TPartition.partition 0 p in
-    let iteri i trans =
-      (** Each time the label changes, we split *)
-      let nlbl = trans.lbl in
-      if Label.compare !label nlbl <> 0 then begin
-        ignore (TPartition.split pt p);
-        label := nlbl
-      end;
-      TPartition.mark i p
-    in
-    TSet.iteri iteri transitions;
-    ignore (TPartition.split pt p);
-  end;
+  let index = ref 0 in
+  let p = env.splitter_partition in
+  let pt = TPartition.partition 0 p in
+  let iter _ trans =
+    let iter t = TPartition.mark !index p; incr index in
+    List.iter iter trans;
+    ignore (TPartition.split pt p)
+  in
+  TMap.iter iter transitions;
   (** Push every splitter in the todo stack *)
   let fold pt todo = pt :: todo in
   let splitter_todo = TPartition.fold_all fold env.splitter_partition [] in

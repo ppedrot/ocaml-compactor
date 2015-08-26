@@ -11,12 +11,11 @@ sig
   type label
   type state
   type transition = {
-    lbl : label;
     src : state;
     dst : state;
   }
 
-  module TSet : Set.S with type elt = transition
+  module TMap : Map.S with type key = label
 
   type automaton = {
     states : int;
@@ -25,8 +24,9 @@ sig
     (** A set of state partitions initially known to be observationally
         distinct. For instance, if the automaton has the list [l] as accepting
         states, one can set [partitions = [|l|]]. *)
-    transitions : TSet.t;
-    (** The transitions of the automaton. *)
+    transitions : transition list TMap.t;
+    (** The transitions of the automaton filtered by label. Each list in the map
+        must be nonempty and without duplicates. *)
   }
 
   val reduce : automaton -> state list array
