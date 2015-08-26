@@ -53,9 +53,9 @@ let magic_number = "\132\149\166\190"
 
 (** Memory reification *)
 
-type repr =
+type event =
 | RInt of int
-| RBlock of (int * int) (* tag × len *)
+| RBlock of int * int (* tag × len *)
 | RString of string
 | RPointer of int
 | RCode of int
@@ -69,6 +69,20 @@ type data =
 type obj =
 | Struct of int * data array (* tag × data *)
 | String of string
+
+type header = {
+  magic : string;
+  length : int;
+  size32 : int;
+  size64 : int;
+  objects : int
+}
+
+type 'a listener = {
+  header : header -> 'a;
+  event : event -> 'a -> 'a;
+  close : 'a -> 'a;
+}
 
 (* let input_byte (s, off) =
   let ans = Char.code (s.[!off]) in
@@ -103,6 +117,7 @@ module type S =
 sig
   type input
   val parse : input -> (data * obj array)
+  val listen : input -> 'a listener -> 'a
 end
 
 module Make(M : Input) =
@@ -125,14 +140,13 @@ let input_binary_int chan =
 let input_char chan = Char.chr (input_byte chan)
 
 let parse_header chan =
-  let () = current_offset := 0 in
   let magic = String.create 4 in
   let () = for i = 0 to 3 do magic.[i] <- input_char chan done in
   let length = input_binary_int chan in
   let objects = input_binary_int chan in
   let size32 = input_binary_int chan in
   let size64 = input_binary_int chan in
-  (magic, length, size32, size64, objects)
+  { magic; length; size32; size64; objects; }
 
 let input_int8s chan =
   let i = input_byte chan in
@@ -262,9 +276,11 @@ let parse_object chan =
   | CODE_SHARED32 ->
     RPointer (input_int32u chan)
   | CODE_BLOCK32 ->
-    RBlock (input_header32 chan)
+    let (tag, len) = input_header32 chan in
+    RBlock (tag, len)
   | CODE_BLOCK64 ->
-    RBlock (input_header64 chan)
+    let (tag, len) = input_header64 chan in
+    RBlock (tag, len)
   | CODE_STRING8 ->
     let len = input_int8u chan in
     RString (input_string len chan)
@@ -286,9 +302,9 @@ let parse_object chan =
     Printf.eprintf "Unknown code %04x\n%!" data; assert false
 
 let parse chan =
-  let (magic, len, _, _, size) = parse_header chan in
-  let () = assert (magic = magic_number) in
-  let memory = Array.make size (Struct ((-1), [||])) in
+  let header = parse_header chan in
+  let () = assert (header.magic = magic_number) in
+  let memory = Array.make header.objects (Struct ((-1), [||])) in
   let current_object = ref 0 in
   let fill_obj = function
   | RPointer n ->
@@ -334,6 +350,21 @@ let parse chan =
   let ans = [|Atm (-1)|] in
   let () = fill ans 0 [] in
   (ans.(0), memory)
+
+  let listen chan listener =
+    let header = parse_header chan in
+    let () = current_offset := 0 in
+    let () = assert (header.magic = magic_number) in
+    let accu = listener.header header in
+    let count = header.objects in
+    let rec run accu =
+      if !current_offset = header.length then listener.close accu
+      else
+        let ev = parse_object chan in
+        let accu = listener.event ev accu in
+        run accu
+    in
+    run accu
 
 (*let dump chan =
   let magic = input_binary_int chan in
@@ -382,3 +413,6 @@ module PString = Make(IString)
 
 let parse_channel = PChannel.parse
 let parse_string s = PString.parse (s, ref 0)
+
+let listen_channel = PChannel.listen
+let listen_string s l = PString.listen (s, ref 0) l
