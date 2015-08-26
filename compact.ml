@@ -149,6 +149,97 @@ let to_automaton obj mem =
     transitions = !transitions;
     partitions = partitions; }
 
+type context = {
+  mutable obj_index : int;
+  obj_total : int;
+  mutable fields : int list FieldsMap.t;
+  mutable strings : int list StringMap.t;
+  mutable obj_stack : int list;
+  mutable off_stack : int list;
+  mutable len_stack : int list;
+  mutable fld_stack : Fields.t list;
+  mutable transitions : HC.transition list HC.TMap.t;
+}
+
+let rec cleanup ctx =
+  match ctx.obj_stack, ctx.off_stack, ctx.len_stack, ctx.fld_stack with
+  | [], [], [], [] -> ()
+  | obj :: objs, off :: offs, len :: lens, fld :: flds ->
+    if off = len then begin
+      ctx.obj_stack <- objs;
+      ctx.off_stack <- offs;
+      ctx.len_stack <- lens;
+      ctx.fld_stack <- flds;
+      let old = try FieldsMap.find fld ctx.fields with Not_found -> [] in
+      ctx.fields <- FieldsMap.add fld (obj :: old) ctx.fields;
+      cleanup ctx
+    end
+  | _ -> assert false
+
+let listener =
+  let header h = {
+    obj_index = 0;
+    obj_total = h.objects;
+    fields = FieldsMap.empty;
+    strings = StringMap.empty;
+    obj_stack = [];
+    off_stack = [];
+    len_stack = [];
+    fld_stack = [];
+    transitions = HC.TMap.empty;
+  } in
+  let push ctx lbl src dst =
+    let t = { HC.src = src; dst = dst } in
+    let trans = try HC.TMap.find lbl ctx.transitions with Not_found -> [] in
+    ctx.transitions <- HC.TMap.add lbl (t :: trans) ctx.transitions
+  in
+  let event ev ctx =
+    let () = match ctx.obj_stack, ctx.off_stack, ctx.fld_stack with
+    | [], [], [] -> ()
+    | ptr :: _, i :: offs, f :: flds ->
+      begin match ev with
+      | RInt n -> ctx.fld_stack <- (i :: n :: f) :: flds
+      | RBlock (tag, 0) -> push ctx (AtomT (i, tag)) ptr ptr
+      | RBlock _ | RString _ -> push ctx (PFieldT i) ptr ctx.obj_index
+      | RPointer off -> push ctx (PFieldT i) ptr (ctx.obj_index - off)
+      | RCode _ -> assert false
+      end;
+      ctx.off_stack <- (succ i) :: offs;
+    | _ -> assert false
+    in
+    let () = match ev with
+    | RInt _ | RBlock (_, 0) | RPointer _ | RCode _ -> cleanup ctx
+    | RBlock (tag, len) ->
+      ctx.obj_stack <- ctx.obj_index :: ctx.obj_stack;
+      ctx.off_stack <- 0 :: ctx.off_stack;
+      ctx.len_stack <- len :: ctx.len_stack;
+      ctx.fld_stack <- [tag] :: ctx.fld_stack;
+      ctx.obj_index <- ctx.obj_index + 1;
+    | RString s ->
+      let old = try StringMap.find s ctx.strings with Not_found -> [] in
+      ctx.strings <- StringMap.add s (ctx.obj_index :: old) ctx.strings;
+      ctx.obj_index <- ctx.obj_index + 1;
+      cleanup ctx;
+    in
+
+    ctx
+  in
+  let close ctx =
+    assert (ctx.obj_stack = []);
+    assert (ctx.obj_index = ctx.obj_total);
+    ctx
+  in
+  { header; event; close }
+
+let to_automaton_async chan =
+  let ctx = listen_channel chan listener in
+  let fold _ obj accu = obj :: accu in
+  let partitions = FieldsMap.fold fold ctx.fields [] in
+  let partitions = StringMap.fold fold ctx.strings partitions in
+  { HC.states = ctx.obj_total;
+    transitions = ctx.transitions;
+    partitions = partitions; }
+
 let reduce obj mem =
   if Array.length mem = 0 then (obj, mem)
   else
