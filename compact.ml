@@ -129,7 +129,7 @@ let to_automaton obj mem =
   let () = Array.iteri iter mem in
   { HC.states = size;
     transitions = Array.of_list !transitions;
-    final_states = [||]; }
+    partitions = [||]; }
 
 let reduce obj mem =
   if Array.length mem = 0 then (obj, mem)

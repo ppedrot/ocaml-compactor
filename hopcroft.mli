@@ -17,11 +17,13 @@ sig
   }
   type automaton = {
     states : int;
-    (** The number of states of the automaton *)
-    final_states : state array;
-    (** The final states *)
+    (** The number of states of the automaton. *)
+    partitions : state list array;
+    (** A set of state partitions initially known to be observationally
+        distinct. For instance, if the automaton has the list [l] as accepting
+        states, one can set [partitions = [|l|]]. *)
     transitions : transition array;
-    (** The transitions of the automaton without duplicates *)
+    (** The transitions of the automaton without duplicates. *)
   }
 
   val reduce : automaton -> state list array

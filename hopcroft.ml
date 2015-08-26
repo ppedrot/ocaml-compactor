@@ -16,8 +16,8 @@ sig
   type automaton = {
     states : int;
     (** The number of states of the automaton *)
-    final_states : state array;
-    (** The final states *)
+    partitions : state list array;
+    (** A set of state partitions *)
     transitions : transition array;
     (** The transitions of the automaton without duplicates *)
   }
@@ -46,7 +46,7 @@ type transition = {
 
 type automaton = {
   states : int;
-  final_states : state array;
+  partitions : state list array;
   transitions : transition array;
 }
 
@@ -108,11 +108,14 @@ let init automaton =
   (** Push every splitter in the todo stack *)
   let fold pt todo = pt :: todo in
   let splitter_todo = TPartition.fold_all fold env.splitter_partition [] in
-  (** Mark every final state and split *)
-  let ps = SPartition.partition 0 env.state_partition in
-  let iter state = SPartition.mark state env.state_partition in
-  Array.iter iter automaton.final_states;
-  ignore (SPartition.split ps env.state_partition);
+  (** Mark every state in each partition and split *)
+  let separate pt =
+    let ps = SPartition.partition 0 env.state_partition in
+    let iter state = SPartition.mark state env.state_partition in
+    List.iter iter pt;
+    ignore (SPartition.split ps env.state_partition)
+  in
+  Array.iter separate automaton.partitions;
   env, splitter_todo
 
 let split_partition s inv env todo =
