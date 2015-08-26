@@ -1,9 +1,35 @@
 open Analyze
 
+module Fields =
+struct
+  type t =
+    int (* tag *) *
+    (int * int) list (* pairs of positions / values ordered by position *)
+
+  let int_compare (x : int) y = Pervasives.compare x y
+
+  let rec list_compare l1 l2 = match l1, l2 with
+  | [], [] -> 0
+  | [], _ :: _ -> 1
+  | _ :: _, [] -> -1
+  | (xi, yi) :: li, (xj, yj) :: lj ->
+    let c = int_compare xi xj in
+    if c <> 0 then c
+    else
+      let c = int_compare yi yj in
+      if c <> 0 then c else list_compare li lj
+
+  let compare (i, li) (j, lj) =
+    let c = int_compare i j in
+    if c <> 0 then c else list_compare li lj
+
+end
+
+module FieldsMap = Map.Make(Fields)
+
 type transition =
 | AtomT of int * int (* field number * tag *)
 | PFieldT of int (* field number *)
-| IFieldT of int * int (* field number * int value *)
 
 module TransitionOrd =
 struct
@@ -16,15 +42,9 @@ struct
     let c = int_compare n1 n2 in
     if c = 0 then int_compare t1 t2 else c
   | PFieldT n1, PFieldT n2 -> int_compare n1 n2
-  | IFieldT (n1, i1), IFieldT (n2, i2) ->
-    let c = int_compare n1 n2 in
-    if c = 0 then int_compare i1 i2 else c
-
-  | AtomT (_, _), (PFieldT _ | IFieldT (_, _)) -> -1
-  | PFieldT _, (IFieldT (_, _)) -> -1
+  | AtomT (_, _), PFieldT _ -> -1
 
   | PFieldT _, (AtomT (_, _)) -> 1
-  | IFieldT (_, _), (AtomT (_, _) | PFieldT _) -> 1
 
 end
 
@@ -102,7 +122,7 @@ let to_automaton obj mem =
   (** Create the automaton *)
   let size = Array.length mem in
   let transitions = ref HC.TMap.empty in
-  let tags = Array.make 256 [] in
+  let fields = ref FieldsMap.empty in
   let strings = ref StringMap.empty in
   let push lbl src dst =
     let t = { HC.src = src; dst = dst } in
@@ -111,21 +131,23 @@ let to_automaton obj mem =
   in
   let iter ptr = function
   | Struct (tag, value) ->
-    let () = tags.(tag) <- ptr :: tags.(tag) in
-    let iter i = function
-    | Int n -> push (IFieldT (i, n)) ptr ptr
-    | Ptr q -> push (PFieldT i) ptr q
-    | Atm t -> push (AtomT (i, t)) ptr ptr
+    let fold (i, accu) = function
+    | Int n -> (succ i, (i, n) :: accu)
+    | Ptr q -> push (PFieldT i) ptr q; (succ i, accu)
+    | Atm t -> push (AtomT (i, t)) ptr ptr; (succ i, accu)
     | Fun _ -> assert false
     in
-    Array.iteri iter value
+    let (_, fs) = Array.fold_left fold (0, []) value in
+    let key = (tag, fs) in
+    let old = try FieldsMap.find key !fields with Not_found -> [] in
+    fields := FieldsMap.add key (ptr :: old) !fields
   | String s ->
     let old = try StringMap.find s !strings with Not_found -> [] in
     strings := StringMap.add s (ptr :: old) !strings
   in
   let () = Array.iteri iter mem in
   let fold _ obj accu = obj :: accu in
-  let partitions = StringMap.fold fold !strings (Array.to_list tags) in
+  let partitions = FieldsMap.fold fold !fields (StringMap.fold fold !strings []) in
   { HC.states = size;
     transitions = !transitions;
     partitions = partitions; }
