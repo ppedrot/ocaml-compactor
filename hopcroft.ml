@@ -18,7 +18,7 @@ sig
   type automaton = {
     states : int;
     (** The number of states of the automaton *)
-    partitions : state list array;
+    partitions : state list list;
     (** A set of state partitions *)
     transitions : transition list TMap.t;
     (** The transitions of the automaton *)
@@ -67,7 +67,7 @@ end
 
 type automaton = {
   states : int;
-  partitions : state list array;
+  partitions : state list list;
   transitions : transition list TMap.t;
 }
 
@@ -119,15 +119,7 @@ let init automaton =
   (** Push every splitter in the todo stack *)
   let fold pt todo = pt :: todo in
   let splitter_todo = TPartition.fold_all fold env.splitter_partition [] in
-  (** Mark every state in each partition and split *)
-  let separate pt =
-    let ps = SPartition.partition 0 env.state_partition in
-    let iter state = SPartition.mark state env.state_partition in
-    List.iter iter pt;
-    ignore (SPartition.split ps env.state_partition)
-  in
-  Array.iter separate automaton.partitions;
-  env, splitter_todo
+  env, splitter_todo, automaton.partitions
 
 let split_partition s inv env todo =
   let p = env.state_partition in
@@ -157,8 +149,19 @@ let split_partition s inv env todo =
     todo
 
 let reduce_aux automaton =
-  let env, splitter_todo = init automaton in
+  let env, splitter_todo, initial = init automaton in
   let inv = reverse automaton in
+  (** Mark every state in each initial partition and split *)
+  let ps = SPartition.partition 0 env.state_partition in
+  let splitter_todo =
+    let separate todo pt =
+      let iter state = SPartition.mark state env.state_partition in
+      List.iter iter pt;
+      split_partition ps inv env todo
+    in
+    List.fold_left separate splitter_todo initial
+  in
+  (** Main loop *)
   let rec loop = function
   | [] -> ()
   | pt :: todo ->
