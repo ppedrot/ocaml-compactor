@@ -4,6 +4,11 @@ sig
   val compare : t -> t -> int
 end
 
+class type ['a] foldable =
+object
+  method fold : 'r. ('a -> 'r -> 'r) -> 'r -> 'r
+end
+
 module type S =
 sig
   type label
@@ -18,9 +23,9 @@ sig
   type automaton = {
     states : int;
     (** The number of states of the automaton *)
-    partitions : state list list;
+    partitions : state foldable list;
     (** A set of state partitions *)
-    transitions : transition list TMap.t;
+    transitions : transition foldable TMap.t;
     (** The transitions of the automaton *)
   }
 
@@ -49,26 +54,22 @@ module TMap =
 struct
   include Map.Make(Label)
 
-  let iteri (f : int -> Label.t -> 'a -> unit) (s : 'a list t) =
-    let rec f' lbl trans i = match trans with
-    | [] -> i
-    | t :: trans -> f i lbl t; f' lbl trans (succ i)
+  let iteri f (s : 'a foldable t) =
+    let f' lbl (trans : 'a foldable) i =
+      trans#fold (fun x i -> f i lbl x; succ i) i
     in
     ignore (fold f' s 0)
 
-  let cardinals (s : 'a list t) =
-    let rec f lbl trans i = match trans with
-    | [] -> i
-    | _ :: trans -> f lbl trans (succ i)
-    in
+  let cardinals (s : 'a foldable t) =
+    let f _ (trans : 'a foldable) i = trans#fold (fun _ i -> succ i) i in
     fold f s 0
 
 end
 
 type automaton = {
   states : int;
-  partitions : state list list;
-  transitions : transition list TMap.t;
+  partitions : state foldable list;
+  transitions : transition foldable TMap.t;
 }
 
 (** Partitions of states *)
@@ -110,9 +111,9 @@ let init automaton =
   let index = ref 0 in
   let p = env.splitter_partition in
   let pt = TPartition.partition 0 p in
-  let iter _ trans =
-    let iter t = TPartition.mark !index p; incr index in
-    List.iter iter trans;
+  let iter _ (trans : 'a foldable) =
+    let iter t () = TPartition.mark !index p; incr index in
+    trans#fold iter ();
     ignore (TPartition.split pt p)
   in
   TMap.iter iter transitions;
@@ -154,9 +155,9 @@ let reduce_aux automaton =
   (** Mark every state in each initial partition and split *)
   let ps = SPartition.partition 0 env.state_partition in
   let splitter_todo =
-    let separate todo pt =
-      let iter state = SPartition.mark state env.state_partition in
-      List.iter iter pt;
+    let separate todo (pt : 'a foldable) =
+      let iter state () = SPartition.mark state env.state_partition in
+      pt#fold iter ();
       split_partition ps inv env todo
     in
     List.fold_left separate splitter_todo initial

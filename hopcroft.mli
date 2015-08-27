@@ -6,6 +6,11 @@ sig
   val compare : t -> t -> int
 end
 
+class type ['a] foldable =
+object
+  method fold : 'r. ('a -> 'r -> 'r) -> 'r -> 'r
+end
+
 module type S =
 sig
   type label
@@ -20,11 +25,11 @@ sig
   type automaton = {
     states : int;
     (** The number of states of the automaton. *)
-    partitions : state list list;
+    partitions : state foldable list;
     (** A set of state partitions initially known to be observationally
         distinct. For instance, if the automaton has the list [l] as accepting
         states, one can set [partitions = [l]]. *)
-    transitions : transition list TMap.t;
+    transitions : transition foldable TMap.t;
     (** The transitions of the automaton filtered by label. Each list in the map
         must be nonempty and without duplicates. *)
   }
