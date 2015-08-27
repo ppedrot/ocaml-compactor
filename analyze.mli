@@ -30,9 +30,14 @@ type header = {
 }
 
 type 'a listener = {
-  header : header -> 'a;
-  event : event -> 'a -> 'a;
-  close : 'a -> 'a;
+  iheader : header -> 'a;
+  ievent : event -> 'a -> 'a;
+  iclose : 'a -> 'a;
+}
+
+type echoer = {
+  oevent : event -> unit;
+  oclose : unit -> header;
 }
 
 val parse_channel : in_channel -> (data * obj array)
@@ -40,6 +45,8 @@ val parse_string : string -> (data * obj array)
 
 val listen_channel : in_channel -> 'a listener -> 'a
 val listen_string : string -> 'a listener -> 'a
+
+val echo_channel : out_channel -> echoer
 
 (** {6 Functorized version} *)
 
@@ -53,7 +60,7 @@ sig
 end
 (** Type of inputs *)
 
-module type S =
+module type IS =
 sig
   type input
   val parse : input -> (data * obj array)
@@ -62,5 +69,27 @@ sig
   val listen : input -> 'a listener -> 'a
 end
 
-module Make (M : Input) : S with type input = M.t
+module IMake (M : Input) : IS with type input = M.t
+(** Functorized version of the previous code. *)
+
+module type Output =
+sig
+  type t
+  val output_byte : t -> int -> unit
+  (** Output a single byte *)
+  val output_binary_int : t -> int -> unit
+  (** Output a big-endian 31-bits signed integer *)
+  val pos : t -> int
+  (** Get the current position in the output stream *)
+  val seek : t -> int -> unit
+  (** Go to the given position in the output stream *)
+end
+
+module type OS =
+sig
+  type output
+  val echo : output -> echoer
+end
+
+module OMake (M : Output) : OS with type output = M.t
 (** Functorized version of the previous code. *)

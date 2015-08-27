@@ -40,8 +40,8 @@ let main () =
   (* magic number *)
   let magic = input_binary_int in_chan in
   let () = output_binary_int out_chan magic in
-  (* segments; there are 5 of them in 8.5 *)
-  for i = 0 to 4 do
+  (* segments; there are 6 of them in 8.5 *)
+  for i = 0 to 5 do
 (*   let () = Printf.eprintf "library: %i objects\n%!" (Array.length libmem) in *)
 (*   let () = Printf.eprintf "compact library: %i objects\n%!" (Array.length libmem) in *)
     let (obj, mem, digest) = parse_segment in_chan in

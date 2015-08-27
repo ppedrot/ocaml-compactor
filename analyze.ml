@@ -79,32 +79,15 @@ type header = {
 }
 
 type 'a listener = {
-  header : header -> 'a;
-  event : event -> 'a -> 'a;
-  close : 'a -> 'a;
+  iheader : header -> 'a;
+  ievent : event -> 'a -> 'a;
+  iclose : 'a -> 'a;
 }
 
-(* let input_byte (s, off) =
-  let ans = Char.code (s.[!off]) in
-  let () = incr off in
-  ans
-
-let input_char (s, off) =
-  let ans = s.[!off] in
-  let () = incr off in
-  ans
-
-let input_binary_int chan =
-  let i = input_byte chan in
-  let j = input_byte chan in
-  let k = input_byte chan in
-  let l = input_byte chan in
-  let ans = (i lsl 24) lor (j lsl 16) lor (k lsl 8) lor l in
-  if i land 0x80 = 0
-    then ans
-    else ans lor ((-1) lsl 31)
-
-let of_string s = (s, ref 0)*)
+type echoer = {
+  oevent : event -> unit;
+  oclose : unit -> header;
+}
 
 module type Input =
 sig
@@ -113,14 +96,29 @@ sig
   val input_binary_int : t -> int
 end
 
-module type S =
+module type Output =
+sig
+  type t
+  val output_byte : t -> int -> unit
+  val output_binary_int : t -> int -> unit
+  val pos : t -> int
+  val seek : t -> int -> unit
+end
+
+module type IS =
 sig
   type input
   val parse : input -> (data * obj array)
   val listen : input -> 'a listener -> 'a
 end
 
-module Make(M : Input) =
+module type OS =
+sig
+  type output
+  val echo : output -> echoer
+end
+
+module IMake(M : Input) =
 struct
 
 open M
@@ -355,28 +353,250 @@ let parse chan =
     let header = parse_header chan in
     let () = current_offset := 0 in
     let () = assert (header.magic = magic_number) in
-    let accu = listener.header header in
+    let accu = listener.iheader header in
     let count = header.objects in
     let rec run accu =
-      if !current_offset = header.length then listener.close accu
+      if !current_offset = header.length then listener.iclose accu
       else
         let ev = parse_object chan in
-        let accu = listener.event ev accu in
+        let accu = listener.ievent ev accu in
         run accu
     in
     run accu
 
-(*let dump chan =
-  let magic = input_binary_int chan in
-  let light = parse chan in
-  let digest = parse chan in
-  let table = parse chan in
-  (magic, light, digest, table)
+end
 
-let () =
-  let chan = open_in Sys.argv.(1) in
-  let _ = dump chan in
-  ()*)
+module OMake(M : Output) =
+struct
+
+open M
+
+type output = M.t
+
+let current_offset = ref 0
+
+let output_byte chan i =
+  let () = incr current_offset in
+  output_byte chan i
+
+let output_binary_int chan i =
+  let () = current_offset := !current_offset + 4 in
+  output_binary_int chan i
+
+let output_char chan c = output_byte chan (Char.code c)
+
+let print_header chan header =
+  for i = 0 to 3 do output_char chan header.magic.[i] done;
+  output_binary_int chan header.length;
+  output_binary_int chan header.objects;
+  output_binary_int chan header.size32;
+  output_binary_int chan header.size64
+
+let output_int8s chan n =
+  let i = (n land 0x7F) lor (if n < 0 then 0x80 else 0x00) in
+  output_byte chan i
+
+let output_int8u = output_byte
+
+let output_int16s chan n =
+  let i = ((n lsr 8) land 0x7F) lor (if n < 0 then 0x80 else 0x00) in
+  let j = n land 0xFF in
+  output_byte chan i;
+  output_byte chan j
+
+let output_int16u chan n =
+  let i = (n lsr 8) land 0xFF in
+  let j = n land 0xFF in
+  output_byte chan i;
+  output_byte chan j
+
+let output_int32s chan n =
+  let i = ((n lsr 24) land 0x7F) lor (if n < 0 then 0x80 else 0x00) in
+  let j = (n lsr 16) land 0xFF in
+  let k = (n lsr 8) land 0xFF in
+  let l = n land 0xFF in
+  output_byte chan i;
+  output_byte chan j;
+  output_byte chan k;
+  output_byte chan l
+
+let output_int32u chan n =
+  let i = (n lsr 24) land 0xFF in
+  let j = (n lsr 16) land 0xFF in
+  let k = (n lsr 8) land 0xFF in
+  let l = n land 0xFF in
+  output_byte chan i;
+  output_byte chan j;
+  output_byte chan k;
+  output_byte chan l
+
+let output_int64s chan e =
+  let i = ((e lsr 56) land 0x7F) lor (if e < 0 then 0x80 else 0x00) in
+  let j = (e lsr 48) land 0xFF in
+  let k = (e lsr 40) land 0xFF in
+  let l = (e lsr 32) land 0xFF in
+  let m = (e lsr 24) land 0xFF in
+  let n = (e lsr 16) land 0xFF in
+  let o = (e lsr 8) land 0xFF in
+  let p = e land 0xFF in
+  output_byte chan i;
+  output_byte chan j;
+  output_byte chan k;
+  output_byte chan l;
+  output_byte chan m;
+  output_byte chan n;
+  output_byte chan o;
+  output_byte chan p
+
+let output_int64u chan e =
+  let i = (e lsr 56) land 0xFF in
+  let j = (e lsr 48) land 0xFF in
+  let k = (e lsr 40) land 0xFF in
+  let l = (e lsr 32) land 0xFF in
+  let m = (e lsr 24) land 0xFF in
+  let n = (e lsr 16) land 0xFF in
+  let o = (e lsr 8) land 0xFF in
+  let p = e land 0xFF in
+  output_byte chan i;
+  output_byte chan j;
+  output_byte chan k;
+  output_byte chan l;
+  output_byte chan m;
+  output_byte chan n;
+  output_byte chan o;
+  output_byte chan p
+
+let output_header32 chan tag len =
+  output_byte chan (len lsr 14);
+  output_byte chan (len lsr 6);
+  output_byte chan (len lsl 2);
+  output_byte chan tag
+
+let output_header64 chan tag len =
+  output_byte chan (len lsr 46);
+  output_byte chan (len lsr 38);
+  output_byte chan (len lsr 30);
+  output_byte chan (len lsr 22);
+  output_byte chan (len lsr 14);
+  output_byte chan (len lsr 6);
+  output_byte chan (len lsl 2);
+  output_byte chan tag
+
+let output_string chan s =
+  for i = 0 to String.length s - 1 do
+    output_char chan s.[i];
+  done
+
+let fits n bound = - bound <= n && n < bound
+
+let output_event chan = function
+| RInt n ->
+  if 0 <= n && n < prefix_small_int then
+    output_byte chan (prefix_small_int lor n)
+  else if fits n 0x80 then begin
+    output_byte chan code_int8;
+    output_int8s chan n
+  end else if fits n 0x8000 then begin
+    output_byte chan code_int16;
+    output_int16s chan n
+  end else if Sys.word_size = 32 || fits n 0x80000000 then begin
+    output_byte chan code_int32;
+    output_int32s chan n
+  end else begin
+    output_byte chan code_int64;
+    output_int64s chan n
+  end
+| RBlock (tag, len) ->
+  if tag <= 0x0F && len <= 0x07 then
+    output_byte chan (prefix_small_block lor tag lor (len lsl 4))
+  else if len <= 0x3FFFFFFF then begin
+    output_byte chan code_block32;
+    output_header32 chan tag len
+  end else begin
+    output_byte chan code_block64;
+    output_header64 chan tag len
+  end
+| RString s ->
+  let len = String.length s in
+  if len < prefix_small_string then begin
+    output_byte chan (prefix_small_string lor len);
+    output_string chan s
+  end else if len <= 0xFF then begin
+    output_byte chan code_string8;
+    output_int8u chan len;
+    output_string chan s
+  end else begin
+    output_byte chan code_string32;
+    output_int32u chan len;
+    output_string chan s
+  end
+| RPointer ptr ->
+  if ptr <= 0xFF then begin
+    output_byte chan code_shared8;
+    output_int8u chan ptr
+  end else if ptr <= 0xFFFF then begin
+    output_byte chan code_shared16;
+    output_int16u chan ptr
+  end else begin
+    output_byte chan code_shared32;
+    output_int32u chan ptr
+  end
+| RCode addr -> assert false
+
+let get_size32 = function
+| RInt _ -> 0
+| RBlock (_, 0) -> 0
+| RBlock (_, len) -> 1 + len
+| RString s -> 2 + (String.length s) / 4
+| RPointer _ -> 0
+| RCode _ -> assert false
+
+let get_size64 = function
+| RInt _ -> 0
+| RBlock (_, 0) -> 0
+| RBlock (_, len) -> 1 + len
+| RString s -> 2 + (String.length s) / 8
+| RPointer _ -> 0
+| RCode _ -> assert false
+
+let get_objects = function
+| RBlock (_, 0) | RPointer _ | RCode _ | RInt _ -> 0
+| RBlock (_, _) | RString _ -> 1
+
+let echo chan =
+  let pos = M.pos chan in
+  let objects = ref 0 in
+  let size32 = ref 0 in
+  let size64 = ref 0 in
+  let oevent event =
+    output_event chan event;
+    size32 := get_size32 event + !size32;
+    size64 := get_size64 event + !size64;
+    objects := get_objects event + !objects;
+  in
+  let oclose () =
+    let header = {
+      magic = magic_number;
+      objects = !objects;
+      length = !current_offset;
+      size32 = !size32;
+      size64 = !size64;
+    } in
+    (** Outputs the header in the reserved room *)
+    let npos = M.pos chan in
+    M.seek chan pos;
+    for i = 0 to 3 do output_byte chan (Char.code header.magic.[i]) done;
+    output_binary_int chan header.length;
+    output_binary_int chan header.objects;
+    output_binary_int chan header.size32;
+    output_binary_int chan header.size64;
+    let () = M.seek chan npos in
+    header
+  in
+  (** Output temporary placeholder bytes for the header *)
+  for i = 0 to 4 do output_binary_int chan (-1) done;
+  current_offset := 0;
+  { oevent; oclose; }
 
 end
 
@@ -385,6 +605,15 @@ struct
   type t = in_channel
   let input_byte = Pervasives.input_byte
   let input_binary_int = Pervasives.input_binary_int
+end
+
+module OChannel =
+struct
+  type t = out_channel
+  let output_byte = Pervasives.output_byte
+  let output_binary_int = Pervasives.output_binary_int
+  let seek = Pervasives.seek_out
+  let pos = Pervasives.pos_out
 end
 
 module IString =
@@ -408,11 +637,15 @@ struct
 
 end
 
-module PChannel = Make(IChannel)
-module PString = Make(IString)
+module IPChannel = IMake(IChannel)
+module IPString = IMake(IString)
 
-let parse_channel = PChannel.parse
-let parse_string s = PString.parse (s, ref 0)
+module OPChannel = OMake(OChannel)
 
-let listen_channel = PChannel.listen
-let listen_string s l = PString.listen (s, ref 0) l
+let parse_channel = IPChannel.parse
+let parse_string s = IPString.parse (s, ref 0)
+
+let listen_channel = IPChannel.listen
+let listen_string s l = IPString.listen (s, ref 0) l
+
+let echo_channel = OPChannel.echo

@@ -185,7 +185,7 @@ let rec cleanup ctx =
   | _ -> assert false
 
 let listener =
-  let header h = {
+  let iheader h = {
     obj_index = 0;
     obj_total = h.objects;
     fields = FieldsMap.empty;
@@ -201,7 +201,7 @@ let listener =
     (try (HC.TMap.find lbl ctx.transitions)#push t
     with Not_found -> ctx.transitions <- HC.TMap.add lbl (new stack t) ctx.transitions)
   in
-  let event ev ctx =
+  let ievent ev ctx =
     let () = match ctx.obj_stack, ctx.off_stack, ctx.fld_stack with
     | [], [], [] -> ()
     | ptr :: _, i :: offs, f :: flds ->
@@ -232,12 +232,12 @@ let listener =
 
     ctx
   in
-  let close ctx =
+  let iclose ctx =
     assert (ctx.obj_stack = []);
     assert (ctx.obj_index = ctx.obj_total);
     ctx
   in
-  { header; event; close }
+  { iheader; ievent; iclose }
 
 let to_automaton_async chan =
   let ctx = listen_channel chan listener in
