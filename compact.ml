@@ -288,3 +288,102 @@ let represent obj mem =
   let () = Array.iteri iter mem in
   (** Return the entry point *)
   represent obj
+
+type tcontext = {
+  mutable tobj_index : int;
+  (** Offset of the current object in the intput structure *)
+  mutable tobj_output : int;
+  (** Offset of the current object in the output structure *)
+  tobj_total : int;
+  (** Number of expected objects *)
+  mutable tskp_stack : bool list;
+  mutable toff_stack : int list;
+}
+
+let canonicalize size part =
+  let ans = Array.make size (-1) in
+  let iter s =
+    let get_min (i : int) accu = if i < accu then i else accu in
+    let min = HC.SPartition.fold s get_min part max_int in
+    HC.SPartition.iter s (fun i -> ans.(i) <- min) part
+  in
+  let () = HC.SPartition.iter_all iter part in
+  ans
+
+let rec tcleanup ctx =
+  match ctx.tskp_stack, ctx.toff_stack with
+  | [], [] -> ()
+  | _ :: skps, off :: offs ->
+    if off = 0 then begin
+      ctx.tskp_stack <- skps;
+      ctx.toff_stack <- offs;
+      tcleanup ctx
+    end
+  | _ -> assert false
+
+let transduce ichan ochan =
+  let init_pos = pos_in ichan in
+  let automaton = to_automaton_async ichan in
+  let states = automaton.HC.states in
+  let partition = HC.reduce_partition automaton in
+  let reduced = HC.SPartition.length partition in
+  let canonical = canonicalize states partition in
+  let is_canonical ptr = canonical.(ptr) < 0 || ptr = canonical.(ptr) in
+  let rec get_canonical ptr =
+    let repr = canonical.(ptr) in
+    if repr < 0 then - repr else get_canonical repr
+  in
+  let echoer = echo_channel ochan in
+  let iheader h = {
+    tobj_index = 0;
+    tobj_output = 0;
+    tobj_total = h.objects;
+    tskp_stack = [];
+    toff_stack = [];
+  } in
+  let ievent ev ctx =
+    let keep = match ctx.tskp_stack with [] -> true | can :: _ -> can in
+    if keep then begin match ev with
+    | RInt _ | RBlock (_, 0) -> echoer.oevent ev
+    | RPointer off ->
+      let ptr = get_canonical (ctx.tobj_index - off) in
+      echoer.oevent (RPointer ptr)
+    | RBlock (_, _) | RString _ ->
+      let can = is_canonical ctx.tobj_index in
+      if can then begin
+        echoer.oevent ev;
+        canonical.(ctx.tobj_index) <- (- ctx.tobj_output);
+        ctx.tobj_output <- 1 + ctx.tobj_output;
+      end else
+        echoer.oevent (RPointer (get_canonical ctx.tobj_index));
+    | RCode _ -> assert false
+    end;
+    begin match ctx.toff_stack with
+    | [] -> ()
+    | off :: offs -> ctx.toff_stack <- pred off :: offs;
+    end;
+    begin match ev with
+    | RInt _ | RBlock (_, 0) | RPointer _ -> tcleanup ctx
+    | RBlock (_, len) ->
+      let can = is_canonical ctx.tobj_index in
+      ctx.tskp_stack <- can :: ctx.tskp_stack;
+      ctx.toff_stack <- len :: ctx.toff_stack;
+      ctx.tobj_index <- ctx.tobj_index + 1;
+    | RString _ ->
+      ctx.tobj_index <- ctx.tobj_index + 1;
+      tcleanup ctx
+    | RCode _ -> assert false
+    end;
+    ctx
+  in
+  let iclose ctx =
+    let header = echoer.oclose () in
+    assert (ctx.tskp_stack = []);
+    assert (ctx.tobj_index = states);
+    assert (header.objects = reduced);
+    ctx
+  in
+  let listener = { iheader; ievent; iclose; } in
+  (** Go back and output the reduced structure online *)
+  let () = seek_in ichan init_pos in
+  ignore (listen_channel ichan listener);
