@@ -48,13 +48,15 @@ end
 module HC = Hopcroft.Make(TransitionOrd)
 module StringMap = Map.Make(String)
 
-class ['a] stack (init : 'a) =
-object
-  val mutable data = [init]
-  method fold : 'r. ('a -> 'r -> 'r) -> 'r -> 'r = fun f accu ->
-    List.fold_left (fun x accu -> f accu x) accu data
-  method push x = data <- x :: data
-end
+let int_stack x =
+  let ans = new Container.int_stack in
+  ans#push x;
+  ans
+
+let trans_stack x =
+  let ans = new Container.transition_stack in
+  ans#push x;
+  ans
 
 let normalize obj mem cl =
   let open HC in
@@ -130,9 +132,9 @@ let to_automaton obj mem =
   let fields = ref FieldsMap.empty in
   let strings = ref StringMap.empty in
   let push lbl src dst =
-    let t = { HC.src = src; dst = dst } in
+    let t = { Hopcroft.src = src; dst = dst } in
     (try (HC.TMap.find lbl !transitions)#push t
-    with Not_found -> transitions := HC.TMap.add lbl (new stack t) !transitions)
+    with Not_found -> transitions := HC.TMap.add lbl (trans_stack t) !transitions)
   in
   let iter ptr = function
   | Struct (tag, value) ->
@@ -145,10 +147,10 @@ let to_automaton obj mem =
     let (_, fs) = Array.fold_left fold (0, []) value in
     let key = tag :: fs in
     (try (FieldsMap.find key !fields)#push ptr
-    with Not_found -> fields := FieldsMap.add key (new stack ptr) !fields)
+    with Not_found -> fields := FieldsMap.add key (int_stack ptr) !fields)
   | String s ->
     (try (StringMap.find s !strings)#push ptr
-    with Not_found -> strings := StringMap.add s (new stack ptr) !strings)
+    with Not_found -> strings := StringMap.add s (int_stack ptr) !strings)
   in
   let () = Array.iteri iter mem in
   let fold _ obj accu = (obj :> _ Hopcroft.foldable) :: accu in
@@ -160,13 +162,13 @@ let to_automaton obj mem =
 type context = {
   mutable obj_index : int;
   obj_total : int;
-  mutable fields : int stack FieldsMap.t;
-  mutable strings : int stack StringMap.t;
+  mutable fields : int Container.stack FieldsMap.t;
+  mutable strings : int Container.stack StringMap.t;
   mutable obj_stack : int list;
   mutable off_stack : int list;
   mutable len_stack : int list;
   mutable fld_stack : Fields.t list;
-  mutable transitions : HC.transition stack HC.TMap.t;
+  mutable transitions : int Hopcroft.transition Container.stack HC.TMap.t;
 }
 
 let rec cleanup ctx =
@@ -179,7 +181,7 @@ let rec cleanup ctx =
       ctx.len_stack <- lens;
       ctx.fld_stack <- flds;
       (try (FieldsMap.find fld ctx.fields)#push obj
-      with Not_found -> ctx.fields <- FieldsMap.add fld(new stack obj) ctx.fields);
+      with Not_found -> ctx.fields <- FieldsMap.add fld (int_stack obj) ctx.fields);
       cleanup ctx
     end
   | _ -> assert false
@@ -197,9 +199,9 @@ let listener =
     transitions = HC.TMap.empty;
   } in
   let push ctx lbl src dst =
-    let t = { HC.src = src; dst = dst } in
+    let t = { Hopcroft.src = src; dst = dst } in
     (try (HC.TMap.find lbl ctx.transitions)#push t
-    with Not_found -> ctx.transitions <- HC.TMap.add lbl (new stack t) ctx.transitions)
+    with Not_found -> ctx.transitions <- HC.TMap.add lbl (trans_stack t) ctx.transitions)
   in
   let ievent ev ctx =
     let () = match ctx.obj_stack, ctx.off_stack, ctx.fld_stack with
@@ -225,7 +227,7 @@ let listener =
       ctx.obj_index <- ctx.obj_index + 1;
     | RString s ->
       (try (StringMap.find s ctx.strings)#push ctx.obj_index
-      with Not_found -> ctx.strings <- StringMap.add s (new stack ctx.obj_index) ctx.strings);
+      with Not_found -> ctx.strings <- StringMap.add s (int_stack ctx.obj_index) ctx.strings);
       ctx.obj_index <- ctx.obj_index + 1;
       cleanup ctx;
     in

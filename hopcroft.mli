@@ -11,14 +11,15 @@ object
   method fold : 'r. ('a -> 'r -> 'r) -> 'r -> 'r
 end
 
+type 'state transition = {
+  src : 'state;
+  dst : 'state;
+}
+
 module type S =
 sig
   type label
   type state
-  type transition = {
-    src : state;
-    dst : state;
-  }
 
   module TMap : Map.S with type key = label
 
@@ -29,7 +30,7 @@ sig
     (** A set of state partitions initially known to be observationally
         distinct. For instance, if the automaton has the list [l] as accepting
         states, one can set [partitions = [l]]. *)
-    transitions : transition foldable TMap.t;
+    transitions : state transition foldable TMap.t;
     (** The transitions of the automaton filtered by label. Each list in the map
         must be nonempty and without duplicates. *)
   }

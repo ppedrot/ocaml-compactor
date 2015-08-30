@@ -9,14 +9,15 @@ object
   method fold : 'r. ('a -> 'r -> 'r) -> 'r -> 'r
 end
 
+type 'state transition = {
+  src : 'state;
+  dst : 'state;
+}
+
 module type S =
 sig
   type label
   type state
-  type transition = {
-    src : state;
-    dst : state;
-  }
 
   module TMap : Map.S with type key = label
 
@@ -25,7 +26,7 @@ sig
     (** The number of states of the automaton *)
     partitions : state foldable list;
     (** A set of state partitions *)
-    transitions : transition foldable TMap.t;
+    transitions : state transition foldable TMap.t;
     (** The transitions of the automaton *)
   }
 
@@ -44,11 +45,6 @@ struct
 
 type label = Label.t
 type state = int
-
-type transition = {
-  src : state;
-  dst : state;
-}
 
 module TMap =
 struct
@@ -69,7 +65,7 @@ end
 type automaton = {
   states : int;
   partitions : state foldable list;
-  transitions : transition foldable TMap.t;
+  transitions : state transition foldable TMap.t;
 }
 
 (** Partitions of states *)
