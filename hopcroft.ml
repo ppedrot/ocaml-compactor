@@ -78,6 +78,7 @@ type environment = {
   state_partition : SPartition.t;
   splitter_partition : TPartition.t;
   transition_source : int array;
+  transition_inverse : int list array;
 }
 
 (** Associate the list of transitions ending in a given state *)
@@ -99,6 +100,7 @@ let init automaton =
     state_partition = SPartition.create automaton.states;
     splitter_partition = TPartition.create len;
     transition_source = Array.create len (-1);
+    transition_inverse = reverse automaton;
   } in
   (** Set the source of the transitions *)
   let iteri i _ trans = env.transition_source.(i) <- trans.src in
@@ -118,7 +120,7 @@ let init automaton =
   let splitter_todo = TPartition.fold_all fold env.splitter_partition [] in
   env, splitter_todo, automaton.partitions
 
-let split_partition s inv env todo =
+let split_partition s env todo =
   let p = env.state_partition in
   let r = SPartition.split s p in
   if SPartition.is_valid r then begin
@@ -133,7 +135,7 @@ let split_partition s inv env todo =
         let () = TPartition.mark trans env.splitter_partition in
         accu
       in
-      List.fold_left fold accu inv.(state)
+      List.fold_left fold accu env.transition_inverse.(state)
     in
     let splitter_touched = SPartition.fold r fold p [] in
     let fold_touched todo pt =
@@ -147,14 +149,13 @@ let split_partition s inv env todo =
 
 let reduce_aux automaton =
   let env, splitter_todo, initial = init automaton in
-  let inv = reverse automaton in
   (** Mark every state in each initial partition and split *)
   let ps = SPartition.partition 0 env.state_partition in
   let splitter_todo =
     let separate todo (pt : 'a foldable) =
       let iter state () = SPartition.mark state env.state_partition in
       pt#fold iter ();
-      split_partition ps inv env todo
+      split_partition ps env todo
     in
     List.fold_left separate splitter_todo initial
   in
@@ -173,15 +174,15 @@ let reduce_aux automaton =
       state_touched
     in
     let state_touched = TPartition.fold pt fold env.splitter_partition [] in
-    let fold_touched todo equiv = split_partition equiv inv env todo in
+    let fold_touched todo equiv = split_partition equiv env todo in
     let splitter_todo = List.fold_left fold_touched todo state_touched in
     loop splitter_todo
   in
   let () = loop splitter_todo in
-  (env, inv)
+  env
 
 let reduce automaton =
-  let (ans, _) = reduce_aux automaton in
+  let ans = reduce_aux automaton in
   let mapping = Array.create (SPartition.length ans.state_partition) [] in
   let iter set =
     let pi = SPartition.represent set in
@@ -195,7 +196,7 @@ let reduce automaton =
   mapping
 
   let reduce_partition automaton =
-    let (ans, _) = reduce_aux automaton in
+    let ans = reduce_aux automaton in
     ans.state_partition
 
 end
